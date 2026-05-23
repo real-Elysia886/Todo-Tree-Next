@@ -45,7 +45,7 @@
 
 **方式一：VS Code 插件市场**
 
-在 VS Code 扩展商店搜索 **Todo Tree Next** 即可安装。
+在 VS Code 扩展商店搜索 **Todo Tree_Next** 即可安装。
 
 **方式二：离线安装 .vsix**
 
