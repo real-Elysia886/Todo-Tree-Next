@@ -1,0 +1,10 @@
+{
+  "regex": "(//|#|<!--|;|/\\*|^|^[ \\t]*(-|\\d+.))\\s*(TODO|FIXME|BUG|HACK|\\[ \\]|\\[x\\])",
+  "case_sensitive": true,
+  "tags": ["TODO", "FIXME", "BUG", "HACK", "[ ]", "[x]"],
+  "include_globs": [],
+  "exclude_globs": [],
+  "include_hidden_files": false,
+  "max_file_size": 1048576,
+  "native_markdown": true
+}

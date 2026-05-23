@@ -13,7 +13,7 @@
     "icon": "resources/todo-tree.png",
     "publisher": "Gruntfuggly",
     "engines": {
-        "vscode": "^1.72.0"
+        "vscode": "^1.120.0"
     },
     "repository": "https://github.com/Gruntfuggly/todo-tree",
     "bugs": {
