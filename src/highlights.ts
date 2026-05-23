@@ -1,14 +1,14 @@
-var vscode = require( 'vscode' );
+var vscode = require( 'vscode' ) as typeof import('vscode');
 var execWithIndices = require( "regexp-match-indices" ).shim();
 
-var config = require( './config.js' );
-var utils = require( './utils.js' );
-var attributes = require( './attributes.js' );
-var icons = require( './icons.js' );
+var config = require( './config.js' ) as any;
+var utils = require( './utils.js' ) as any;
+var attributes = require( './attributes.js' ) as any;
+var icons = require( './icons.js' ) as any;
 
 var captureGroupArgument = "capture-groups";
 
-var lanes =
+var lanes: Record<string, number | undefined> =
 {
     "none": undefined,
     "left": 1,
@@ -17,19 +17,19 @@ var lanes =
     "full": 7
 };
 
-var decorations = {};
-var highlightTimer = {};
-var context;
-var debug;
+var decorations: Record<string, any> = {};
+var highlightTimer: Record<string, any> = {};
+var context: any;
+var debug: (text: string) => void;
 
-function init( context_, debug_ )
+function init( context_: any, debug_: (text: string) => void ): void
 {
     context = context_;
     debug = debug_;
     context.subscriptions.push( decorations );
 }
 
-function applyOpacity( colour, opacity )
+function applyOpacity( colour: string, opacity: number ): string
 {
     if( utils.isHexColour( colour ) )
     {
@@ -115,7 +115,7 @@ function getDecoration( tag )
     {
         lane = lanes[ lane.toLowerCase() ];
     }
-    var decorationOptions = {
+    var decorationOptions: any = {
         borderRadius: getBorderRadius( tag ),
         isWholeLine: getType( tag ) === 'whole-line',
         fontWeight: getFontWeight( tag ),
