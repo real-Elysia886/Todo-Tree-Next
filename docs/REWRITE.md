@@ -1,5 +1,17 @@
 # Todo Tree Next Rewrite
 
+## AI Agent Interface
+
+本阶段新增 `Agent-ready TODO Intelligence Layer`：
+
+- Rust CLI 新增 `todo-scanner agent-context --root <workspace> --config <config.json>`。
+- VS Code 新增 `todo-tree.getAgentContext`，向 AI Code 工具返回结构化 TODO 上下文。
+- VS Code 新增 `todo-tree.annotateAgentFinding`，允许 Agent 把审查结果、风险提示、修复建议写入临时 Diagnostic 标注。
+- VS Code 新增 `todo-tree.clearAgentAnnotations`，清理 Agent 标注。
+- 输出包含文件路径、行列号、标签、优先级、负责人、截止日期、Git 状态、历史年龄、上下文片段、推荐动作和推荐处理顺序。
+
+完整协议见 [AGENT_INTERFACE.md](AGENT_INTERFACE.md)。
+
 本仓库正在按 `重写方案.txt` 做就地重写。当前阶段保留成熟的 VS Code
 插件 UI、树视图、高亮和命令体系，同时把全工作区扫描替换为 Rust 扫描核心。
 

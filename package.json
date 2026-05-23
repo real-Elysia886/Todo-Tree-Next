@@ -444,6 +444,24 @@
                 "icon": "$(graph)"
             },
             {
+                "command": "todo-tree.getAgentContext",
+                "title": "Get Agent TODO Context",
+                "category": "%todo-tree.command.category%",
+                "icon": "$(json)"
+            },
+            {
+                "command": "todo-tree.annotateAgentFinding",
+                "title": "Annotate Agent Finding",
+                "category": "%todo-tree.command.category%",
+                "icon": "$(comment-discussion)"
+            },
+            {
+                "command": "todo-tree.clearAgentAnnotations",
+                "title": "Clear Agent Annotations",
+                "category": "%todo-tree.command.category%",
+                "icon": "$(clear-all)"
+            },
+            {
                 "command": "todo-tree.showOnlyThisFolder",
                 "title": "%todo-tree.command.showOnlyThisFolder.title%",
                 "category": "%todo-tree.command.category%",

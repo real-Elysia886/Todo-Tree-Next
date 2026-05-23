@@ -18,7 +18,7 @@
   <img src="https://img.shields.io/badge/TypeScript-4.x-blue?logo=typescript" alt="TypeScript">
   <img src="https://img.shields.io/badge/Rust-Scanner-orange?logo=rust" alt="Rust">
   <img src="https://img.shields.io/badge/VS%20Code-Extension-007ACC?logo=visual-studio-code" alt="VS Code">
-  <img src="https://img.shields.io/badge/Tests-131%20passing-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-135%20passing-brightgreen" alt="Tests">
 </p>
 
 ---
@@ -36,6 +36,7 @@ This is a **modern rewrite** of the popular [Todo Tree](https://github.com/Grunt
 | Git integration | Minimal | **Changed/staged scan + debt reports** |
 | Dashboard | None | **Interactive Webview with charts** |
 | Priority tracking | None | **P0–P3, @assignee, due:date, #labels** |
+| AI agent interface | None | **Agent-ready TODO context + editor annotations** |
 | Architecture | Monolithic JS | **Modular TypeScript + Rust** |
 
 ---
@@ -64,7 +65,7 @@ cd new-todo-tree
 npm install
 npm run scanner:build   # Requires Rust toolchain
 npm run webpack
-npm test                # 93 QUnit + 38 Rust = 131 tests
+npm test                # 97 QUnit + 38 Rust = 135 tests
 ```
 
 Press `F5` in VS Code to launch the extension in a development host.
@@ -136,6 +137,36 @@ Todo Tree: Export TODO Debt Report — Compare branch vs base
 
 ---
 
+## AI Agent Interface
+
+Todo Tree Next exposes TODO debt as structured data for AI coding tools. Agents can read ranked TODO context and write temporary editor annotations back into VS Code.
+
+Programmatic VS Code commands:
+
+```javascript
+const context = await vscode.commands.executeCommand('todo-tree.getAgentContext');
+
+await vscode.commands.executeCommand('todo-tree.annotateAgentFinding', {
+  file: 'src/auth.ts',
+  line: 42,
+  column: 5,
+  severity: 'warning',
+  message: 'P0 TODO touches authentication code; review before merge.'
+});
+
+await vscode.commands.executeCommand('todo-tree.clearAgentAnnotations');
+```
+
+CLI:
+
+```bash
+todo-scanner agent-context --root . --config todo-scanner-config.json
+```
+
+The JSON output includes file path, line/column, tag, priority, assignee, due date, labels, Git status, approximate age, context snippet, recommended action, and recommended processing order. See [docs/AGENT_INTERFACE.md](docs/AGENT_INTERFACE.md) for the schema.
+
+---
+
 ## 🏷️ Priority & Metadata
 
 ```javascript
@@ -166,8 +197,8 @@ See [docs/BENCHMARK.md](docs/BENCHMARK.md) for full report.
 | Type | Count | Coverage |
 |------|-------|----------|
 | Rust unit tests | 38 | Tag matching, priority, metadata, markdown, file skip |
-| QUnit unit tests | 93 | Filter query, debt report, scanner mapping, git files |
-| **Total** | **131** | |
+| QUnit unit tests | 97 | Filter query, debt report, scanner mapping, git files, scope guards |
+| **Total** | **135** | |
 
 ---
 
@@ -182,6 +213,7 @@ src/
 ├── dashboard.ts          # Webview dashboard + charts
 ├── filterQuery.ts        # Smart query parser
 ├── debtReport.ts         # Git diff debt report
+├── agentInterface.ts     # AI agent context + annotations
 ├── gitScanner.ts         # Git changed/staged scan
 ├── configMigrator.ts     # Settings migration
 ├── scopeManager.ts       # Folder filter commands
@@ -193,7 +225,7 @@ src/
 └── types.ts              # Shared TypeScript types
 
 scanner/src/
-├── main.rs               # CLI: scan-workspace, scan-file, benchmark
+├── main.rs               # CLI: scan-workspace, scan-file, agent-context, benchmark
 ├── config.rs             # JSON config parsing
 ├── walker.rs             # .gitignore-aware file traversal
 ├── matcher.rs            # Regex matching + metadata extraction
@@ -238,4 +270,4 @@ MIT — see [LICENSE](LICENSE).
 
 Based on [Todo Tree](https://github.com/Gruntfuggly/todo-tree) by Gruntfuggly.
 
-See [docs/REWRITE.md](docs/REWRITE.md) for architecture docs | [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) for feature compatibility.
+See [docs/REWRITE.md](docs/REWRITE.md) for architecture docs | [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) for feature compatibility | [docs/AGENT_INTERFACE.md](docs/AGENT_INTERFACE.md) for AI agent integration.

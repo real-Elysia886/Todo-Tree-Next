@@ -18,7 +18,7 @@
   <img src="https://img.shields.io/badge/TypeScript-4.x-blue?logo=typescript" alt="TypeScript">
   <img src="https://img.shields.io/badge/Rust-Scanner-orange?logo=rust" alt="Rust">
   <img src="https://img.shields.io/badge/VS%20Code-Extension-007ACC?logo=visual-studio-code" alt="VS Code">
-  <img src="https://img.shields.io/badge/Tests-131%20passing-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-135%20passing-brightgreen" alt="Tests">
 </p>
 
 ---
@@ -36,6 +36,7 @@
 | Git 集成 | 基础 | **变更/暂存扫描 + 债务报告** |
 | 仪表盘 | 无 | **交互式 Webview + SVG 图表** |
 | 优先级追踪 | 无 | **P0–P3、@负责人、due:日期、#标签** |
+| AI Agent 接口 | 无 | **结构化 TODO 上下文 + 编辑器标注** |
 | 架构 | 单体 JS | **模块化 TypeScript + Rust** |
 
 ---
@@ -64,7 +65,7 @@ cd new-todo-tree
 npm install
 npm run scanner:build   # 需要 Rust 工具链
 npm run webpack
-npm test                # 93 QUnit + 38 Rust = 131 个测试
+npm test                # 97 QUnit + 38 Rust = 135 个测试
 ```
 
 在 VS Code 中按 `F5` 启动开发调试。
@@ -136,6 +137,36 @@ Todo Tree: Export TODO Debt Report — 对比分支 TODO 增减
 
 ---
 
+## AI Agent 接口
+
+Todo Tree Next 会把 TODO 技术债暴露为 AI Code 工具可消费的结构化上下文，并允许 Agent 把分析结果回写成 VS Code 临时标注。
+
+程序化 VS Code 命令：
+
+```javascript
+const context = await vscode.commands.executeCommand('todo-tree.getAgentContext');
+
+await vscode.commands.executeCommand('todo-tree.annotateAgentFinding', {
+  file: 'src/auth.ts',
+  line: 42,
+  column: 5,
+  severity: 'warning',
+  message: 'P0 TODO 涉及认证逻辑，合并前需要审查。'
+});
+
+await vscode.commands.executeCommand('todo-tree.clearAgentAnnotations');
+```
+
+CLI：
+
+```bash
+todo-scanner agent-context --root . --config todo-scanner-config.json
+```
+
+输出 JSON 包含文件路径、行列号、标签、优先级、负责人、截止日期、标签元数据、Git 状态、近似历史年龄、上下文代码片段、推荐动作和推荐处理顺序。完整协议见 [docs/AGENT_INTERFACE.md](docs/AGENT_INTERFACE.md)。
+
+---
+
 ## 🏷️ 优先级与元数据
 
 ```javascript
@@ -166,8 +197,8 @@ Todo Tree: Export TODO Debt Report — 对比分支 TODO 增减
 | 测试类型 | 数量 | 覆盖内容 |
 |---------|------|---------|
 | Rust 单元测试 | 38 | 标签匹配、优先级、元数据、Markdown、文件跳过 |
-| QUnit 单元测试 | 93 | 过滤查询、债务报告、扫描器映射、Git 文件解析 |
-| **总计** | **131** | |
+| QUnit 单元测试 | 97 | 过滤查询、债务报告、扫描器映射、Git 文件解析、作用域保护 |
+| **总计** | **135** | |
 
 ---
 
@@ -189,4 +220,4 @@ MIT — 详见 [LICENSE](LICENSE)。
 
 基于 [Todo Tree](https://github.com/Gruntfuggly/todo-tree)（作者 Gruntfuggly）。
 
-架构文档见 [docs/REWRITE.md](docs/REWRITE.md) | 功能兼容列表见 [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)。
+架构文档见 [docs/REWRITE.md](docs/REWRITE.md) | 功能兼容列表见 [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) | AI Agent 接口见 [docs/AGENT_INTERFACE.md](docs/AGENT_INTERFACE.md)。

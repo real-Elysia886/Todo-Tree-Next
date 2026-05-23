@@ -4,7 +4,7 @@ import * as child_process from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { ScanOutput, ScannerMatch, TodoItem } from './types';
+import { AgentContext, ScanOutput, ScannerMatch, TodoItem } from './types';
 
 let currentProcess: child_process.ChildProcess | undefined;
 
@@ -149,7 +149,7 @@ function toMatch(item: TodoItem): ScannerMatch {
             severity: item.severity,
             priority: item.priority,
             assignee: item.assignee,
-            dueDate: item.dueDate,
+            dueDate: item.dueDate || item.due_date,
             labels: item.labels
         }
     };
@@ -175,6 +175,11 @@ function scanFile(context: ExtensionContextLike, root: string, filename: string,
         .then((output) => output.items.map(toMatch));
 }
 
+function getAgentContext(context: ExtensionContextLike, root: string, options: ScannerOptions): Promise<AgentContext> {
+    const configPath = writeConfig(context, options);
+    return execScanner(context, 'agent-context', ['--root', root, '--config', configPath], options) as Promise<unknown> as Promise<AgentContext>;
+}
+
 function kill(): void {
     if (currentProcess !== undefined) {
         currentProcess.kill('SIGINT');
@@ -184,5 +189,5 @@ function kill(): void {
 module.exports.enabled = enabled;
 module.exports.scanWorkspace = scanWorkspace;
 module.exports.scanFile = scanFile;
+module.exports.getAgentContext = getAgentContext;
 module.exports.kill = kill;
-

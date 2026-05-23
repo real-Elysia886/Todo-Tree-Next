@@ -45,6 +45,8 @@ This document maps every core feature of the original [Todo Tree](https://github
 | Markdown TODOs | Native support, zero config | Rust `matcher.rs` |
 | Scan performance | Rust parallel scanner, 7–140x faster incremental | `scannerClient.ts` + Rust |
 | Scanner fallback | Auto-fallback to ripgrep if Rust unavailable | `scannerClient.ts` |
+| AI agent context | Structured TODO data for code agents | `agentInterface.ts` + Rust `agent-context` |
+| Agent annotations | AI tools can write temporary editor diagnostics | `agentInterface.ts` |
 
 ## New Features (not in original)
 
@@ -61,6 +63,8 @@ This document maps every core feature of the original [Todo Tree](https://github
 | Benchmark CLI | Rust `main.rs` benchmark command |
 | Folder scope switching | `scopeManager.ts` |
 | TODO trend chart | `dashboard.ts` (git history) |
+| Agent-ready TODO context | `todo-tree.getAgentContext` + `todo-scanner agent-context` |
+| Agent finding annotations | `todo-tree.annotateAgentFinding` + VS Code diagnostics |
 
 ## Configuration Compatibility
 

@@ -12,7 +12,7 @@ function toMatch(item) {
             severity: item.severity,
             priority: item.priority,
             assignee: item.assignee,
-            dueDate: item.dueDate,
+            dueDate: item.dueDate || item.due_date,
             labels: item.labels
         }
     };
@@ -54,6 +54,15 @@ QUnit.test('passes through dueDate field', function(assert) {
         file: 'a.js', line: 1, column: 1, tag: 'TODO',
         text: '// TODO due:2026-06-01', severity: 'normal', priority: 'none',
         dueDate: '2026-06-01'
+    });
+    assert.equal(match.scanner.dueDate, '2026-06-01');
+});
+
+QUnit.test('maps scanner due_date field to dueDate', function(assert) {
+    var match = toMatch({
+        file: 'a.js', line: 1, column: 1, tag: 'TODO',
+        text: '// TODO due:2026-06-01', severity: 'normal', priority: 'none',
+        due_date: '2026-06-01'
     });
     assert.equal(match.scanner.dueDate, '2026-06-01');
 });

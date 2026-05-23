@@ -27,6 +27,7 @@ var navigationCommands = require( './navigationCommands' );
 var configMigrator = require( './configMigrator' );
 var scopeManager = require( './scopeManager' );
 var debtReport = require( './debtReport' );
+var agentInterface = require( './agentInterface' );
 
 var searchList = [];
 var currentFilter;
@@ -1181,6 +1182,13 @@ function activate( context )
 
         navigationCommands.register( context, utils );
         debtReport.registerCommand( context );
+        agentInterface.registerCommands( {
+            context: context,
+            getRootFolders: getRootFolders,
+            getOptions: getOptions,
+            scannerClient: scannerClient,
+            outputChannel: outputChannel
+        } ).forEach( function( d ) { context.subscriptions.push( d ); } );
 
         context.subscriptions.push( todoTreeView.onDidExpandElement( function( e ) { provider.setExpanded( e.element.fsPath, true ); } ) );
         context.subscriptions.push( todoTreeView.onDidCollapseElement( function( e ) { provider.setExpanded( e.element.fsPath, false ); } ) );

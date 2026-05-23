@@ -5,9 +5,13 @@ export interface ScopeContext {
     debug: (text: string) => void;
     rebuild: () => void;
     clearTreeFilter: () => void;
-    locateWorkspaceNode: (fsPath: string) => { fsPath: string };
+    locateWorkspaceNode: (fsPath: string) => { fsPath: string } | undefined;
     createFolderGlob: (folderPath: string, rootPath: string, suffix: string) => string;
     toGlobArray: (globs: unknown) => string[];
+}
+
+interface ScopeNode {
+    fsPath?: string;
 }
 
 function dumpFolderFilter(ctx: ScopeContext): void {
@@ -16,29 +20,57 @@ function dumpFolderFilter(ctx: ScopeContext): void {
     debug("Folder filter exclude:" + JSON.stringify(context.workspaceState.get('excludeGlobs')));
 }
 
+function nodePath(node: ScopeNode | undefined, action: string): string | undefined {
+    if (node && typeof node.fsPath === 'string' && node.fsPath.length > 0) {
+        return node.fsPath;
+    }
+
+    vscode.window.showWarningMessage("Todo Tree: " + action + " must be run from a Todo Tree file or folder item.");
+    return undefined;
+}
+
+function workspaceRoot(ctx: ScopeContext, fsPath: string, action: string): string | undefined {
+    const rootNode = ctx.locateWorkspaceNode(fsPath);
+    if (rootNode && typeof rootNode.fsPath === 'string' && rootNode.fsPath.length > 0) {
+        return rootNode.fsPath;
+    }
+
+    vscode.window.showWarningMessage("Todo Tree: " + action + " could not locate the workspace folder for this item.");
+    return undefined;
+}
+
 export function registerCommands(ctx: ScopeContext): vscode.Disposable[] {
-    const { context, rebuild, clearTreeFilter, locateWorkspaceNode, createFolderGlob, toGlobArray } = ctx;
+    const { context, rebuild, clearTreeFilter, createFolderGlob, toGlobArray } = ctx;
     const disposables: vscode.Disposable[] = [];
 
-    disposables.push(vscode.commands.registerCommand('todo-tree.showOnlyThisFolder', (node: { fsPath: string }) => {
-        const rootNode = locateWorkspaceNode(node.fsPath);
-        const includeGlobs = [createFolderGlob(node.fsPath, rootNode.fsPath, "/*")];
+    disposables.push(vscode.commands.registerCommand('todo-tree.showOnlyThisFolder', (node: ScopeNode | undefined) => {
+        const path = nodePath(node, "Show Only This Folder");
+        if (!path) return;
+        const rootPath = workspaceRoot(ctx, path, "Show Only This Folder");
+        if (!rootPath) return;
+        const includeGlobs = [createFolderGlob(path, rootPath, "/*")];
         context.workspaceState.update('includeGlobs', includeGlobs);
         rebuild();
         dumpFolderFilter(ctx);
     }));
 
-    disposables.push(vscode.commands.registerCommand('todo-tree.showOnlyThisFolderAndSubfolders', (node: { fsPath: string }) => {
-        const rootNode = locateWorkspaceNode(node.fsPath);
-        const includeGlobs = [createFolderGlob(node.fsPath, rootNode.fsPath, "/**/*")];
+    disposables.push(vscode.commands.registerCommand('todo-tree.showOnlyThisFolderAndSubfolders', (node: ScopeNode | undefined) => {
+        const path = nodePath(node, "Show Only This Folder and Subfolders");
+        if (!path) return;
+        const rootPath = workspaceRoot(ctx, path, "Show Only This Folder and Subfolders");
+        if (!rootPath) return;
+        const includeGlobs = [createFolderGlob(path, rootPath, "/**/*")];
         context.workspaceState.update('includeGlobs', includeGlobs);
         rebuild();
         dumpFolderFilter(ctx);
     }));
 
-    disposables.push(vscode.commands.registerCommand('todo-tree.excludeThisFolder', (node: { fsPath: string }) => {
-        const rootNode = locateWorkspaceNode(node.fsPath);
-        const glob = createFolderGlob(node.fsPath, rootNode.fsPath, "/**/*");
+    disposables.push(vscode.commands.registerCommand('todo-tree.excludeThisFolder', (node: ScopeNode | undefined) => {
+        const path = nodePath(node, "Exclude This Folder");
+        if (!path) return;
+        const rootPath = workspaceRoot(ctx, path, "Exclude This Folder");
+        if (!rootPath) return;
+        const glob = createFolderGlob(path, rootPath, "/**/*");
         const excludeGlobs: string[] = context.workspaceState.get('excludeGlobs') || [];
         if (excludeGlobs.indexOf(glob) === -1) {
             excludeGlobs.push(glob);
@@ -48,10 +80,12 @@ export function registerCommands(ctx: ScopeContext): vscode.Disposable[] {
         }
     }));
 
-    disposables.push(vscode.commands.registerCommand('todo-tree.excludeThisFile', (node: { fsPath: string }) => {
+    disposables.push(vscode.commands.registerCommand('todo-tree.excludeThisFile', (node: ScopeNode | undefined) => {
+        const path = nodePath(node, "Exclude This File");
+        if (!path) return;
         const excludeGlobs: string[] = context.workspaceState.get('excludeGlobs') || [];
-        if (excludeGlobs.indexOf(node.fsPath) === -1) {
-            excludeGlobs.push(node.fsPath);
+        if (excludeGlobs.indexOf(path) === -1) {
+            excludeGlobs.push(path);
             context.workspaceState.update('excludeGlobs', excludeGlobs);
             rebuild();
             dumpFolderFilter(ctx);

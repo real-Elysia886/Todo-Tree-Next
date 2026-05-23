@@ -11,6 +11,7 @@ export interface TodoItem {
     priority: TodoPriority;
     assignee?: string;
     dueDate?: string;
+    due_date?: string;
     labels?: string[];
 }
 
@@ -53,3 +54,49 @@ export interface DashboardStats {
     byPriority: PriorityStats;
 }
 
+export interface AgentContextSummary {
+    total: number;
+    highPriority: number;
+    overdue: number;
+    unassigned: number;
+    changedInCurrentBranch: number;
+}
+
+export interface AgentTodoItem {
+    id: string;
+    file: string;
+    relativePath: string;
+    line: number;
+    column: number;
+    tag: string;
+    priority: TodoPriority;
+    severity: string;
+    assignee?: string;
+    dueDate?: string;
+    labels?: string[];
+    gitStatus?: string;
+    ageDays?: number;
+    text: string;
+    context: string;
+    contextSnippet: string;
+    recommendedOrder: number;
+    recommendedAction: string;
+}
+
+export interface AgentContext {
+    schemaVersion: number;
+    workspace: string;
+    generatedAt: number;
+    summary: AgentContextSummary;
+    items: AgentTodoItem[];
+}
+
+export interface AgentAnnotation {
+    file: string;
+    line: number;
+    column?: number;
+    message: string;
+    severity?: 'error' | 'warning' | 'information' | 'hint';
+    source?: string;
+    code?: string;
+}
