@@ -1,17 +1,64 @@
-// @ts-nocheck
 /* jshint esversion:6 */
 
-var vscode = require( 'vscode' );
-var path = require( "path" );
+var vscode = require( 'vscode' ) as typeof import('vscode');
+var path = require( "path" ) as typeof import('path');
 
-var utils = require( './utils.js' );
-var icons = require( './icons.js' );
-var config = require( './config.js' );
-var filterQuery = require( './filterQuery' );
+var utils = require( './utils.js' ) as any;
+var icons = require( './icons.js' ) as any;
+var config = require( './config.js' ) as any;
+var filterQuery = require( './filterQuery' ) as any;
 
-var workspaceFolders;
-var nodes = [];
-var currentFilter;
+interface TreeNode {
+    type: string;
+    fsPath: string;
+    label: string;
+    nodes?: TreeNode[];
+    id: number;
+    visible: boolean;
+    hidden?: boolean;
+    isFolder?: boolean;
+    isWorkspaceNode?: boolean;
+    isRootTagNode?: boolean;
+    isStatusNode?: boolean;
+    isExtraLine?: boolean;
+    notExported?: boolean;
+    pathElement?: string;
+    pathLabel?: string;
+    tag?: string;
+    subTag?: string;
+    actualTag?: string;
+    line?: number;
+    column?: number;
+    endColumn?: number;
+    uri?: any;
+    parent?: TreeNode;
+    after?: string;
+    before?: string;
+    priority?: string;
+    severity?: string;
+    text?: string;
+    extraLines?: TreeNode[];
+    expanded?: boolean;
+    showCount?: boolean;
+    tooltip?: string;
+    icon?: string;
+    empty?: boolean;
+    description?: string;
+}
+
+interface ScanResult {
+    uri: any;
+    match: string;
+    line: number;
+    column: number;
+    extraLines?: any[];
+    expanded?: boolean;
+    scanner?: { priority?: string; severity?: string };
+}
+
+var workspaceFolders: any;
+var nodes: TreeNode[] = [];
+var currentFilter: string | undefined;
 
 const PATH = "path";
 const TODO = "todo";
@@ -133,7 +180,7 @@ function createWorkspaceRootNode( folder )
     return node;
 }
 
-function createPathNode( folder, pathElements, isFolder, subTag )
+function createPathNode( folder: any, pathElements: any[], isFolder: any, subTag?: any )
 {
     var id = ( buildCounter * 1000000 ) + nodeCounter++;
     var fsPath = pathElements.length > 0 ? path.join( folder, pathElements.join( path.sep ) ) : folder;
@@ -200,7 +247,7 @@ function createSubTagNode( subTag )
     };
 }
 
-function createTodoNode( result )
+function createTodoNode( result: any ): any
 {
     var id = ( buildCounter * 1000000 ) + nodeCounter++;
     var joined = result.match.substr( result.column - 1 );
@@ -273,7 +320,7 @@ function createTodoNode( result )
     return todo;
 }
 
-function locateWorkspaceNode( filename )
+function locateWorkspaceNode( filename: string ): any
 {
     var result;
     nodes.map( function( node )
@@ -287,7 +334,7 @@ function locateWorkspaceNode( filename )
     return result;
 }
 
-function locateFlatChildNode( rootNode, result, tag, subTag )
+function locateFlatChildNode( rootNode: any, result: any, tag: any, subTag: any )
 {
     var parentNodes = ( rootNode === undefined ? nodes : rootNode.nodes );
     var parentNode;
@@ -330,7 +377,7 @@ function locateFlatChildNode( rootNode, result, tag, subTag )
     return childNode;
 }
 
-function locateTreeChildNode( rootNode, pathElements, tag, subTag )
+function locateTreeChildNode( rootNode: any, pathElements: any[], tag: any, subTag: any )
 {
     var childNode;
 
@@ -348,7 +395,7 @@ function locateTreeChildNode( rootNode, pathElements, tag, subTag )
                 tagPathList.push( subTag );
             }
             tagPathList.push( tag );
-            parentNode = createPathNode( rootNode ? rootNode.fsPath : JSON.stringify( result ), tagPathList, subTag );
+            parentNode = createPathNode( rootNode ? rootNode.fsPath : JSON.stringify( rootNode ), tagPathList, subTag );
             parentNode.isRootTagNode = true;
             parentNode.tag = tag;
             parentNodes.push( parentNode );
@@ -360,9 +407,9 @@ function locateTreeChildNode( rootNode, pathElements, tag, subTag )
         parentNode = parentNodes.find( findSubTagNode, subTag );
         if( parentNode === undefined )
         {
-            var subTagPathList = [];
+            var subTagPathList: any[] = [];
             subTagPathList.push( subTag );
-            parentNode = createPathNode( rootNode ? rootNode.fsPath : JSON.stringify( result ), subTagPathList, subTag );
+            parentNode = createPathNode( rootNode ? rootNode.fsPath : JSON.stringify( rootNode ), subTagPathList, subTag );
             parentNode.subTag = subTag;
             parentNodes.push( parentNode );
         }
@@ -387,7 +434,7 @@ function locateTreeChildNode( rootNode, pathElements, tag, subTag )
     return childNode;
 }
 
-function countTags( child, tagCounts, forStatusBar, fileFilter )
+function countTags( child: any, tagCounts: Record<string, number>, forStatusBar: boolean, fileFilter?: string )
 {
     function countTag( node )
     {
@@ -425,7 +472,7 @@ function countTags( child, tagCounts, forStatusBar, fileFilter )
     }
 }
 
-function countChildTags( children, tagCounts, forStatusBar, fileFilter )
+function countChildTags( children: any[], tagCounts: Record<string, number>, forStatusBar: boolean, fileFilter?: string ): Record<string, number>
 {
     children.map( function( child ) { return countTags( child, tagCounts, forStatusBar, fileFilter ); } );
     return tagCounts;
@@ -444,7 +491,14 @@ function addWorkspaceFolders()
 
 class TreeNodeProvider
 {
-    constructor( _context, debug, onTreeRefreshed )
+    _context: any;
+    _debug: (text: string) => void;
+    onTreeRefreshed: (() => void) | undefined;
+    _onDidChangeTreeData: any;
+    onDidChangeTreeData: any;
+    nodesToGet: number;
+
+    constructor( _context: any, debug: (text: string) => void, onTreeRefreshed: (() => void) | undefined )
     {
         this._context = _context;
         this._debug = debug;
@@ -459,7 +513,7 @@ class TreeNodeProvider
         expandedNodes = _context.workspaceState.get( 'expandedNodes', {} );
     }
 
-    getChildren( node )
+    getChildren( node?: TreeNode ): any
     {
         if( node === undefined )
         {
@@ -477,7 +531,7 @@ class TreeNodeProvider
                 this.nodesToGet = result.length;
             }
 
-            var filterStatusNode = { label: "", notExported: true, isStatusNode: true };
+            var filterStatusNode: any = { label: "", notExported: true, isStatusNode: true };
             var includeGlobs = utils.toGlobArray( this._context.workspaceState.get( 'includeGlobs' ) );
             var excludeGlobs = utils.toGlobArray( this._context.workspaceState.get( 'excludeGlobs' ) );
             var totalFilters = includeGlobs.length + excludeGlobs.length;
@@ -581,12 +635,12 @@ class TreeNodeProvider
         }
     }
 
-    getParent( node )
+    getParent( node: TreeNode ): TreeNode | undefined
     {
         return node.parent;
     }
 
-    getTreeItem( node )
+    getTreeItem( node: TreeNode ): any
     {
         var treeItem;
         try
@@ -746,9 +800,9 @@ class TreeNodeProvider
 
         if( config.shouldShowCounts() && isPathNode( node ) )
         {
-            var tagCounts = {};
+            var tagCounts: Record<string, number> = {};
             countTags( node, tagCounts, false );
-            var total = Object.values( tagCounts ).reduce( function( a, b ) { return a + b; }, 0 );
+            var total = Object.values( tagCounts ).reduce( function( a: number, b: number ) { return a + b; }, 0 );
             treeItem.description = total.toString();
         }
 
@@ -779,7 +833,7 @@ class TreeNodeProvider
         return treeItem;
     }
 
-    clear( folders )
+    clear( folders: any ): void
     {
         nodes = [];
 
@@ -802,7 +856,7 @@ class TreeNodeProvider
         this._onDidChangeTreeData.fire();
     }
 
-    filter( text, children )
+    filter( text: string | undefined, children?: TreeNode[] ): void
     {
         var matcher = filterQuery.createMatcher( text, config.showFilterCaseSensitive() );
 
@@ -836,7 +890,7 @@ class TreeNodeProvider
         } );
     }
 
-    clearTreeFilter( children )
+    clearTreeFilter( children?: TreeNode[] ): void
     {
         currentFilter = undefined;
 
@@ -858,7 +912,7 @@ class TreeNodeProvider
         }, this );
     }
 
-    add( result )
+    add( result: ScanResult ): void
     {
         if( nodes.length === 0 )
         {
@@ -961,7 +1015,7 @@ class TreeNodeProvider
         }
     }
 
-    reset( uri, children )
+    reset( uri: any, children?: TreeNode[] ): void
     {
         var fullPath = uri.scheme === 'file' ? uri.fsPath : path.join( uri.authority, uri.fsPath );
 
@@ -1011,7 +1065,7 @@ class TreeNodeProvider
         }
     }
 
-    remove( callback, uri, children )
+    remove( callback: ((fsPath: string) => void) | null, uri: any, children?: TreeNode[] ): TreeNode[]
     {
         var fullPath = uri.scheme === 'file' ? uri.fsPath : path.join( uri.authority, uri.fsPath );
 
@@ -1076,7 +1130,7 @@ class TreeNodeProvider
         return children;
     }
 
-    getElement( filename, found, children )
+    getElement( filename: string, found: (node: TreeNode) => void, children?: TreeNode[] ): void
     {
         if( children === undefined )
         {
@@ -1095,7 +1149,7 @@ class TreeNodeProvider
         }, this );
     }
 
-    setExpanded( path, expanded )
+    setExpanded( path: string, expanded: boolean ): void
     {
         expandedNodes[ path ] = expanded;
         this._context.workspaceState.update( 'expandedNodes', expandedNodes );
@@ -1107,7 +1161,7 @@ class TreeNodeProvider
         this._context.workspaceState.update( 'expandedNodes', expandedNodes );
     }
 
-    getTagCountsForStatusBar( fileFilter )
+    getTagCountsForStatusBar( fileFilter?: string ): Record<string, number>
     {
         var tagCounts = {};
         return countChildTags( nodes, tagCounts, true, fileFilter );
@@ -1119,7 +1173,7 @@ class TreeNodeProvider
         return countChildTags( nodes, tagCounts, false );
     }
 
-    exportChildren( parent, children )
+    exportChildren( parent: any, children: any[] ): any
     {
         children.forEach( function( child )
         {
@@ -1171,7 +1225,7 @@ class TreeNodeProvider
         return treeHasSubTags;
     }
 
-    sort( children )
+    sort( children?: TreeNode[] ): void
     {
         if( config.shouldSortTree() )
         {
