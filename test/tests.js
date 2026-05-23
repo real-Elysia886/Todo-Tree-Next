@@ -636,3 +636,26 @@ QUnit.test( "gitFiles parses porcelain rename target", function( assert )
     assert.equal( entries[ 0 ].indexStatus, "R" );
     assert.equal( entries[ 0 ].file, "new.js" );
 } );
+
+
+QUnit.test( "gitFiles parses copy status", function( assert )
+{
+    var entries = gitFiles.parseStatus( "C  src.js\0dest.js\0" );
+    assert.equal( entries.length, 1 );
+    assert.equal( entries[ 0 ].indexStatus, "C" );
+    assert.equal( entries[ 0 ].file, "dest.js" );
+} );
+
+QUnit.test( "gitFiles handles empty output", function( assert )
+{
+    var entries = gitFiles.parseStatus( "" );
+    assert.equal( entries.length, 0 );
+} );
+
+QUnit.test( "gitFiles handles deleted files", function( assert )
+{
+    var entries = gitFiles.parseStatus( "D  removed.js\0" );
+    assert.equal( entries.length, 1 );
+    assert.equal( entries[ 0 ].indexStatus, "D" );
+    assert.equal( entries[ 0 ].file, "removed.js" );
+} );

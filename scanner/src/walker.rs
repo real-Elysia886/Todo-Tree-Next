@@ -108,3 +108,88 @@ fn normalize_glob(glob: &str) -> String {
     glob.replace('\\', "/")
 }
 
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::TempDir;
+
+    fn test_config() -> crate::config::ScannerConfig {
+        crate::config::ScannerConfig {
+            regex: "TODO".to_string(),
+            case_sensitive: true,
+            tags: vec!["TODO".into()],
+            include_globs: vec![],
+            exclude_globs: vec![],
+            include_hidden_files: false,
+            max_file_size: 1024, // 1KB limit for tests
+            native_markdown: true,
+        }
+    }
+
+    #[test]
+    fn max_file_size_skips_large_files() {
+        let dir = TempDir::new().unwrap();
+        let small = dir.path().join("small.js");
+        let large = dir.path().join("large.js");
+
+        fs::write(&small, "// TODO small").unwrap();
+        fs::write(&large, "x".repeat(2048) + "\n// TODO large").unwrap(); // > 1KB
+
+        let results = readable_text_files(vec![small.clone(), large.clone()], 1024);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].0, small);
+    }
+
+    #[test]
+    fn binary_file_skipped() {
+        let dir = TempDir::new().unwrap();
+        let bin = dir.path().join("binary.dat");
+        let txt = dir.path().join("text.js");
+
+        // Non-UTF-8 content that will cause read_to_string to fail
+        fs::write(&bin, &[0xFF, 0xFE, 0x80, 0x81, 0x82, 0x83]).unwrap();
+        fs::write(&txt, "// TODO text file").unwrap();
+
+        let results = readable_text_files(vec![bin, txt.clone()], 1024 * 1024);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].0, txt);
+    }
+
+    #[test]
+    fn gitignore_excludes_files() {
+        let dir = TempDir::new().unwrap();
+        let root = dir.path();
+
+        // Create .gitignore
+        fs::write(root.join(".gitignore"), "ignored/\n").unwrap();
+
+        // Create source file
+        fs::create_dir_all(root.join("src")).unwrap();
+        fs::write(root.join("src").join("main.js"), "// TODO keep").unwrap();
+
+        // Create ignored file
+        fs::create_dir_all(root.join("ignored")).unwrap();
+        fs::write(root.join("ignored").join("skip.js"), "// TODO skip").unwrap();
+
+        // Initialize git repo so .gitignore is respected
+        std::process::Command::new("git")
+            .args(["init"])
+            .current_dir(root)
+            .output()
+            .ok();
+
+        let config = test_config();
+        let walker = FileWalker::new(root, &config).unwrap();
+        let files = walker.collect_files(&config);
+
+        let file_names: Vec<String> = files.iter()
+            .map(|p| p.file_name().unwrap().to_string_lossy().to_string())
+            .collect();
+
+        assert!(file_names.contains(&"main.js".to_string()));
+        assert!(!file_names.contains(&"skip.js".to_string()));
+    }
+}

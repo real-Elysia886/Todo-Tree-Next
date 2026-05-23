@@ -1,0 +1,19 @@
+{
+  "corpus": {
+    "files": 5000,
+    "todos": 474
+  },
+  "workspace_scan": {
+    "avg_ms": "122.2",
+    "min_ms": "117.6"
+  },
+  "single_file_scan": {
+    "avg_ms": "17.34",
+    "min_ms": "16.59"
+  },
+  "ripgrep_scan": {
+    "avg_ms": "0.0",
+    "min_ms": "0.0"
+  },
+  "improvement": "N/A"
+}

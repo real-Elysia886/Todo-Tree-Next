@@ -161,11 +161,11 @@ mod tests {
     use crate::config::ScannerConfig;
     use std::path::Path;
 
-    fn config() -> ScannerConfig {
+    fn cfg() -> ScannerConfig {
         ScannerConfig {
-            regex: r"(//|#|<!--|;|/\*|^|^[ \t]*(-|\d+.))\s*(TODO|FIXME|\[ \]|\[x\])".to_string(),
+            regex: r"(//|#|<!--|;|/\*|^|^[ \t]*(-|\d+.))\s*(TODO|FIXME|BUG|HACK|\[ \]|\[x\])".to_string(),
             case_sensitive: true,
-            tags: vec!["TODO".to_string(), "FIXME".to_string(), "[ ]".to_string(), "[x]".to_string()],
+            tags: vec!["TODO".into(), "FIXME".into(), "BUG".into(), "HACK".into(), "[ ]".into(), "[x]".into()],
             include_globs: vec![],
             exclude_globs: vec![],
             include_hidden_files: false,
@@ -174,29 +174,82 @@ mod tests {
         }
     }
 
-    #[test]
-    fn scans_code_tags_and_priority() {
-        let matcher = TodoMatcher::new(&config()).unwrap();
-        let items = matcher.scan_text(Path::new("src/main.js"), "// TODO:P0 fix it");
+    fn m() -> TodoMatcher { TodoMatcher::new(&cfg()).unwrap() }
 
-        assert_eq!(items.len(), 1);
-        assert_eq!(items[0].tag, "TODO");
-        assert_eq!(items[0].line, 1);
-        assert_eq!(items[0].column, 1);
-        assert_eq!(items[0].priority, "P0");
+    // --- Tag types ---
+    #[test] fn tag_todo() { let i = m().scan_text(Path::new("a.js"), "// TODO fix"); assert_eq!(i[0].tag, "TODO"); }
+    #[test] fn tag_fixme() { let i = m().scan_text(Path::new("a.js"), "// FIXME broken"); assert_eq!(i[0].tag, "FIXME"); }
+    #[test] fn tag_bug() { let i = m().scan_text(Path::new("a.js"), "// BUG null ptr"); assert_eq!(i[0].tag, "BUG"); }
+    #[test] fn tag_hack() { let i = m().scan_text(Path::new("a.js"), "// HACK workaround"); assert_eq!(i[0].tag, "HACK"); }
+
+    // --- Comment styles ---
+    #[test] fn style_double_slash() { assert_eq!(m().scan_text(Path::new("a.js"), "// TODO x").len(), 1); }
+    #[test] fn style_hash() { assert_eq!(m().scan_text(Path::new("a.py"), "# TODO x").len(), 1); }
+    #[test] fn style_html() { assert_eq!(m().scan_text(Path::new("a.html"), "<!-- TODO x -->").len(), 1); }
+    #[test] fn style_semicolon() { assert_eq!(m().scan_text(Path::new("a.asm"), "; TODO x").len(), 1); }
+    #[test] fn style_block() { assert_eq!(m().scan_text(Path::new("a.c"), "/* TODO x */").len(), 1); }
+    #[test] fn no_match_plain() { assert_eq!(m().scan_text(Path::new("a.js"), "const x = 1;").len(), 0); }
+
+    // --- Multiple matches ---
+    #[test] fn multiple_in_file() {
+        let i = m().scan_text(Path::new("a.js"), "// TODO a\nlet x;\n// FIXME b\n// BUG c");
+        assert_eq!(i.len(), 3);
+        assert_eq!(i[0].line, 1);
+        assert_eq!(i[1].line, 3);
+        assert_eq!(i[2].line, 4);
     }
 
-    #[test]
-    fn scans_markdown_tasks_without_custom_regex() {
-        let mut config = config();
-        config.regex = "TODO".to_string();
-        config.tags = vec!["TODO".to_string(), "[ ]".to_string(), "[x]".to_string()];
+    // --- Priority ---
+    #[test] fn prio_p0() { assert_eq!(m().scan_text(Path::new("a.js"), "// TODO:P0 x")[0].priority, "P0"); }
+    #[test] fn prio_p1() { assert_eq!(m().scan_text(Path::new("a.js"), "// TODO P1 x")[0].priority, "P1"); }
+    #[test] fn prio_p2() { assert_eq!(m().scan_text(Path::new("a.js"), "// FIXME P2 x")[0].priority, "P2"); }
+    #[test] fn prio_p3() { assert_eq!(m().scan_text(Path::new("a.js"), "// TODO P3 x")[0].priority, "P3"); }
+    #[test] fn prio_bang() { assert_eq!(m().scan_text(Path::new("a.js"), "// TODO! urgent")[0].priority, "P0"); }
+    #[test] fn prio_question() { assert_eq!(m().scan_text(Path::new("a.js"), "// TODO? maybe")[0].priority, "P2"); }
+    #[test] fn prio_none() { assert_eq!(m().scan_text(Path::new("a.js"), "// TODO plain")[0].priority, "none"); }
 
-        let matcher = TodoMatcher::new(&config).unwrap();
-        let items = matcher.scan_text(Path::new("README.md"), "- [ ] write docs\n1. [x] done");
+    // --- Metadata: assignee ---
+    #[test] fn assignee_found() { assert_eq!(m().scan_text(Path::new("a.js"), "// TODO @alice fix")[0].assignee, Some("alice".into())); }
+    #[test] fn assignee_missing() { assert_eq!(m().scan_text(Path::new("a.js"), "// TODO no one")[0].assignee, None); }
 
-        assert_eq!(items.len(), 2);
-        assert_eq!(items[0].tag, "[ ]");
-        assert_eq!(items[1].tag, "[x]");
+    // --- Metadata: due date ---
+    #[test] fn due_found() { assert_eq!(m().scan_text(Path::new("a.js"), "// TODO due:2026-06-01")[0].due_date, Some("2026-06-01".into())); }
+    #[test] fn due_missing() { assert_eq!(m().scan_text(Path::new("a.js"), "// TODO no date")[0].due_date, None); }
+
+    // --- Metadata: labels ---
+    #[test] fn label_one() { assert_eq!(m().scan_text(Path::new("a.js"), "// TODO #sec")[0].labels, Some(vec!["sec".into()])); }
+    #[test] fn label_multi() { assert_eq!(m().scan_text(Path::new("a.js"), "// TODO #a #b")[0].labels, Some(vec!["a".into(), "b".into()])); }
+    #[test] fn label_none() { assert_eq!(m().scan_text(Path::new("a.js"), "// TODO plain")[0].labels, None); }
+
+    // --- Full metadata combo ---
+    #[test] fn full_combo() {
+        let i = m().scan_text(Path::new("a.js"), "// TODO:P0 @bob due:2026-01-01 #x #y");
+        assert_eq!(i[0].priority, "P0");
+        assert_eq!(i[0].assignee, Some("bob".into()));
+        assert_eq!(i[0].due_date, Some("2026-01-01".into()));
+        assert_eq!(i[0].labels, Some(vec!["x".into(), "y".into()]));
+    }
+
+    // --- Markdown tasks ---
+    #[test] fn md_unchecked() { assert_eq!(m().scan_text(Path::new("x.md"), "- [ ] task")[0].tag, "[ ]"); }
+    #[test] fn md_checked() { assert_eq!(m().scan_text(Path::new("x.md"), "- [x] done")[0].tag, "[x]"); }
+    #[test] fn md_upper_x() { assert_eq!(m().scan_text(Path::new("x.md"), "- [X] done")[0].tag, "[x]"); }
+    #[test] fn md_numbered() { assert_eq!(m().scan_text(Path::new("x.md"), "1. [ ] num").len(), 1); }
+    #[test] fn md_star() { assert_eq!(m().scan_text(Path::new("x.md"), "* [ ] star").len(), 1); }
+    #[test] fn md_indented() { assert_eq!(m().scan_text(Path::new("x.md"), "  - [ ] ind").len(), 1); }
+
+    // --- Line/column ---
+    #[test] fn line_col() {
+        let i = m().scan_text(Path::new("a.js"), "x\n    // TODO here");
+        assert_eq!(i[0].line, 2);
+        assert_eq!(i[0].column, 5);
+    }
+
+    // --- Case sensitivity ---
+    #[test] fn case_sensitive_no_match() { assert_eq!(m().scan_text(Path::new("a.js"), "// todo x").len(), 0); }
+    #[test] fn case_insensitive_match() {
+        let mut c = cfg(); c.case_sensitive = false;
+        let m = TodoMatcher::new(&c).unwrap();
+        assert_eq!(m.scan_text(Path::new("a.js"), "// todo x").len(), 1);
     }
 }
