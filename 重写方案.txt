@@ -1,0 +1,1642 @@
+# 一、项目定位
+
+项目名称可以叫：
+
+**Fast Todo Tree / Todo Tree Next / Rust Todo Indexer for VS Code**
+
+项目一句话介绍：
+
+> 本项目是对 VS Code 插件 Todo Tree 的现代化重写。新版本采用 TypeScript + Rust 架构，保留原插件的 TODO/FIXME 扫描、树视图展示、跳转、高亮、过滤、导出等核心功能，同时引入 Rust 高性能扫描核心、增量索引、缓存机制、智能过滤和 Git 集成，提升大型代码仓库中的扫描速度、响应速度和可维护性。
+
+这个定位非常贴合赛道要求：
+
+| 赛道要求       | 本项目对应点                               |
+| ---------- | ------------------------------------ |
+| 包含原软件核心功能  | 保留扫描、树视图、跳转、高亮、分组、过滤、导出              |
+| 原则上采用不同语言  | 原项目主要是 JS/TS 插件；新项目引入 Rust 核心        |
+| 有改进或扩展     | 增量索引、缓存、多线程扫描、智能过滤、Git 集成            |
+| 代码量 2000+  | TypeScript 插件层 + Rust 扫描层轻松超过 3000 行 |
+| 新编写代码 70%+ | 全新架构重写，不复制原代码                        |
+| 接口兼容性好     | 兼容核心配置项和用户操作习惯                       |
+| 安全性        | 只读扫描，不执行用户代码，严格路径过滤                  |
+
+# 二、总体技术路线
+
+最推荐的技术方案：
+
+```text
+VS Code 插件层：TypeScript
+核心扫描层：Rust
+通信方式：Rust CLI 子进程 / JSON 协议
+```
+
+不要做纯 Rust，因为 VS Code 插件 API 本身需要 TypeScript/JavaScript 接入；也不要做纯 TypeScript，因为“不同语言重写”和“性能提升”的说服力不够。
+
+推荐架构：
+
+```text
+todo-tree-next/
+├── extension/                  # VS Code 插件层，TypeScript
+│   ├── src/
+│   │   ├── extension.ts         # 插件入口
+│   │   ├── commands.ts          # 命令注册
+│   │   ├── treeProvider.ts      # TODO 树视图
+│   │   ├── decorationManager.ts # 编辑器高亮
+│   │   ├── statusBar.ts         # 状态栏统计
+│   │   ├── config.ts            # 配置读取
+│   │   ├── scannerClient.ts     # 调用 Rust 扫描器
+│   │   ├── fileWatcher.ts       # 文件变更监听
+│   │   └── exportManager.ts     # 导出功能
+│   └── package.json
+│
+├── scanner/                    # Rust 扫描核心
+│   ├── src/
+│   │   ├── main.rs              # CLI 入口
+│   │   ├── config.rs            # 配置解析
+│   │   ├── walker.rs            # 文件遍历
+│   │   ├── matcher.rs           # TODO 正则匹配
+│   │   ├── parser.rs            # 行列号、上下文解析
+│   │   ├── index.rs             # 增量索引
+│   │   ├── filter.rs            # include/exclude 过滤
+│   │   ├── output.rs            # JSON 输出
+│   │   └── benchmark.rs         # 性能统计
+│   └── Cargo.toml
+│
+├── tests/
+├── benches/
+├── docs/
+└── README.md
+```
+
+# 三、功能重写范围
+
+## 1. 必须复刻的核心功能
+
+这些是保证“包含原软件核心功能”的底线。
+
+| 功能              | 说明                               | 优先级 |
+| --------------- | -------------------------------- | --- |
+| 工作区扫描           | 扫描整个 workspace 中的 TODO/FIXME/BUG | P0  |
+| 当前文件扫描          | 只扫描当前打开文件                        | P0  |
+| 打开文件扫描          | 只扫描 VS Code 已打开文件                | P0  |
+| 树状展示            | 按文件夹、文件、标签展示 TODO                | P0  |
+| 点击跳转            | 点击 TODO 后打开文件并跳到对应行列             | P0  |
+| 标签高亮            | 在编辑器中高亮 TODO/FIXME/BUG           | P0  |
+| 自定义标签           | 支持用户配置 TODO、FIXME、BUG、HACK 等标签   | P0  |
+| include/exclude | 支持包含/排除目录和文件                     | P0  |
+| 刷新命令            | 手动重新扫描工作区                        | P0  |
+| 状态栏计数           | 显示 TODO 总数或标签数量                  | P1  |
+| 导出              | 导出 TODO 列表为 JSON/Markdown/TXT    | P1  |
+
+原项目本身提供树视图按钮，例如树形/扁平/标签视图、按 tag 分组、过滤、刷新、扫描打开文件、扫描当前文件、扫描工作区、导出等能力，这些可以作为你重写兼容的依据。
+
+## 2. 建议增强的功能
+
+这些是你的“改进点”，比单纯复刻更重要。
+
+| 改进点           | 价值                                 |
+| ------------- | ---------------------------------- |
+| Rust 多线程扫描    | 提升首次全仓库扫描速度                        |
+| 增量索引          | 文件变化后只重扫变更文件                       |
+| 扫描缓存          | 避免每次刷新全量扫描                         |
+| 智能过滤语法        | 支持 tag/path/text/status 过滤         |
+| Markdown 任务增强 | 原生支持 `- [ ]`、`- [x]`               |
+| Git 集成        | 只看当前改动文件中的 TODO                    |
+| 性能统计面板        | 显示扫描耗时、文件数、TODO 数                  |
+| 大仓库模式         | 对 node_modules、dist、target 等目录默认优化 |
+| 导出格式增强        | 支持 JSON、Markdown、CSV               |
+| 安全路径检查        | 防止扫描越界或危险路径                        |
+
+# 四、核心创新点设计
+
+## 创新点 1：Rust 高性能扫描核心
+
+原项目依赖 ripgrep 搜索 TODO。你的重写可以改成自研 Rust 扫描器，使用 Rust 的并发、零成本抽象和高效正则匹配来处理大仓库。
+
+Rust 扫描器负责：
+
+```text
+1. 遍历 workspace 文件
+2. 读取 include/exclude 配置
+3. 遵循 .gitignore
+4. 跳过二进制文件、大文件、缓存目录
+5. 用正则匹配 TODO/FIXME/BUG 等标签
+6. 计算行号、列号、上下文
+7. 输出 JSON 给 VS Code 插件层
+```
+
+推荐 Rust 依赖：
+
+```toml
+ignore = "0.4"       # 遵循 .gitignore 的高性能遍历
+walkdir = "2"        # 文件遍历
+regex = "1"          # 正则匹配
+globset = "0.4"      # glob include/exclude
+rayon = "1"          # 并行扫描
+serde = "1"          # 序列化
+serde_json = "1"     # JSON 输出
+anyhow = "1"         # 错误处理
+```
+
+输出结构：
+
+```json
+{
+  "workspace": "/path/to/project",
+  "elapsed_ms": 42,
+  "scanned_files": 1280,
+  "matched_files": 37,
+  "total_items": 86,
+  "items": [
+    {
+      "file": "src/main.ts",
+      "line": 18,
+      "column": 7,
+      "tag": "TODO",
+      "text": "TODO: refactor scanner client",
+      "context": "function activate() { ... }",
+      "severity": "normal"
+    }
+  ]
+}
+```
+
+## 创新点 2：增量索引机制
+
+这是最推荐重点做的功能。
+
+传统方式：
+
+```text
+每次刷新 -> 扫描整个 workspace -> 重新生成 TODO 树
+```
+
+你的方式：
+
+```text
+首次扫描 -> 建立索引
+文件保存/修改/删除 -> 只更新对应文件
+树视图刷新 -> 从索引读取
+```
+
+内存索引设计：
+
+```ts
+type TodoIndex = Map<string, TodoItem[]>;
+
+interface TodoItem {
+  file: string;
+  line: number;
+  column: number;
+  tag: string;
+  text: string;
+  subTag?: string;
+  severity: "info" | "warning" | "error";
+  updatedAt: number;
+}
+```
+
+Rust 侧也可以维护一次扫描结果，TypeScript 侧维护视图索引：
+
+```text
+Rust Scanner:
+  scan-workspace
+  scan-file
+  scan-open-files
+
+TypeScript Extension:
+  Map<filePath, TodoItem[]>
+  onDidSaveTextDocument -> scan-file
+  onDidDeleteFiles -> remove from index
+  onDidRenameFiles -> update key
+```
+
+这个设计对比赛很有帮助，因为你可以拿 benchmark 证明：
+
+| 场景          |     原始方式 |         新方式 |
+| ----------- | -------: | ----------: |
+| 10k 文件首次扫描  |     全量扫描 |   Rust 并行扫描 |
+| 修改 1 个文件后刷新 |   重新全量扫描 |   只扫描 1 个文件 |
+| 切换过滤条件      | 可能重新处理结果 |     直接从索引过滤 |
+| 打开大仓库       |     阻塞明显 | 后台扫描 + 分批渲染 |
+
+## 创新点 3：智能过滤查询
+
+原项目支持树视图过滤和 include/exclude globs。你的版本可以升级为类似搜索语法：
+
+```text
+tag:TODO
+tag:FIXME
+path:src/
+text:auth
+file:*.ts
+status:open
+git:changed
+```
+
+例子：
+
+```text
+tag:TODO path:src text:refactor
+```
+
+含义：
+
+```text
+只显示 src 目录下，标签为 TODO，内容包含 refactor 的项目
+```
+
+这会让插件从“TODO 展示工具”变成“代码任务检索工具”。
+
+## 创新点 4：Markdown TODO 原生支持
+
+原 README 中提到 Markdown TODO 需要通过 regex 和 tags 配置支持 `- [ ]`、`- [x]` 这类任务项。 你的改进点可以是：**无需用户手动配置，默认原生支持 Markdown 任务列表。**
+
+支持格式：
+
+```markdown
+- [ ] 未完成任务
+- [x] 已完成任务
+1. [ ] 编号任务
+2. [x] 已完成编号任务
+```
+
+树视图可以显示为：
+
+```text
+Markdown Tasks
+├── Open
+│   └── README.md:12 未完成任务
+└── Done
+    └── ROADMAP.md:8 已完成任务
+```
+
+这个点实现难度不高，但很容易展示。
+
+## 创新点 5：Git 集成
+
+这是进阶加分项。
+
+功能：
+
+```text
+1. 只显示当前 Git 变更文件中的 TODO
+2. 标记新增 TODO / 已存在 TODO
+3. 支持扫描 staged 文件
+4. 支持导出当前分支新增 TODO 报告
+```
+
+典型使用场景：
+
+> 开发者提交代码前，查看本次改动是否引入新的 TODO/FIXME。
+
+可以新增命令：
+
+```text
+Todo Tree Next: Show TODOs in Changed Files
+Todo Tree Next: Show TODOs in Staged Files
+Todo Tree Next: Export TODO Debt Report
+```
+
+# 五、配置兼容方案
+
+不建议承诺 100% 兼容原 Todo Tree 的全部配置，因为它配置项很多。你应该写：
+
+> 兼容原项目核心配置项，并对部分配置进行现代化简化。
+
+优先兼容这些：
+
+```json
+{
+  "todoTreeNext.general.tags": ["TODO", "FIXME", "BUG", "HACK"],
+  "todoTreeNext.general.rootFolder": "",
+  "todoTreeNext.regex.regex": "",
+  "todoTreeNext.regex.caseSensitive": true,
+  "todoTreeNext.filtering.includeGlobs": [],
+  "todoTreeNext.filtering.excludeGlobs": ["**/node_modules/**", "**/dist/**"],
+  "todoTreeNext.highlights.enabled": true,
+  "todoTreeNext.highlights.defaultHighlight": {},
+  "todoTreeNext.tree.groupBy": "file",
+  "todoTreeNext.tree.scanMode": "workspace",
+  "todoTreeNext.export.format": "json"
+}
+```
+
+原项目中也有 tags、tagGroups、rootFolder、schemes、include/exclude、statusBar、高亮、regex、scanMode 等大量配置项，可以挑核心部分兼容。
+
+# 六、功能模块详细设计
+
+## 模块 1：插件入口 Extension
+
+职责：
+
+```text
+1. 激活插件
+2. 初始化 TreeView
+3. 注册命令
+4. 初始化状态栏
+5. 初始化文件监听
+6. 加载用户配置
+7. 启动首次扫描
+```
+
+主要文件：
+
+```text
+extension/src/extension.ts
+extension/src/commands.ts
+extension/src/config.ts
+```
+
+核心命令：
+
+```text
+todoTreeNext.refresh
+todoTreeNext.scanWorkspace
+todoTreeNext.scanCurrentFile
+todoTreeNext.scanOpenFiles
+todoTreeNext.showChangedFilesOnly
+todoTreeNext.export
+todoTreeNext.toggleHighlight
+todoTreeNext.switchViewMode
+```
+
+## 模块 2：Rust 扫描器
+
+职责：
+
+```text
+1. 接收 JSON 配置
+2. 扫描 workspace 或单文件
+3. 匹配 TODO 标签
+4. 输出结构化结果
+5. 返回性能统计
+```
+
+CLI 命令设计：
+
+```bash
+todo-scanner scan-workspace --config config.json
+todo-scanner scan-file --file src/main.ts --config config.json
+todo-scanner benchmark --config config.json
+```
+
+Rust 输出只负责数据，不负责 UI。
+
+## 模块 3：TreeView 树视图
+
+支持三种视图：
+
+```text
+1. Tree 模式：按目录/文件展示
+2. Tag 模式：按 TODO/FIXME/BUG 展示
+3. Flat 模式：扁平列表展示
+```
+
+原项目也提供树形、扁平、仅标签视图，以及按 tag 分组、按文件组织等展示方式。
+
+树结构示例：
+
+```text
+TODO Tree Next
+├── src
+│   ├── scanner.ts
+│   │   ├── TODO line 32: optimize cache update
+│   │   └── FIXME line 88: handle Windows path
+│   └── extension.ts
+│       └── TODO line 15: register export command
+└── README.md
+    └── [ ] line 23: add usage docs
+```
+
+## 模块 4：编辑器高亮
+
+支持：
+
+```text
+1. 只高亮 tag
+2. 高亮 tag + 后续文本
+3. 高亮整行
+4. gutter 图标
+5. overview ruler 标记
+```
+
+原项目高亮配置非常丰富，包括 foreground、background、opacity、fontWeight、icon、gutterIcon、rulerColour、type 等。 你可以第一版实现核心高亮，后续再扩展高级样式。
+
+## 模块 5：文件监听和增量更新
+
+监听事件：
+
+```ts
+vscode.workspace.onDidSaveTextDocument(...)
+vscode.workspace.onDidCreateFiles(...)
+vscode.workspace.onDidDeleteFiles(...)
+vscode.workspace.onDidRenameFiles(...)
+vscode.workspace.onDidChangeConfiguration(...)
+```
+
+更新策略：
+
+```text
+保存文件 -> scan-file -> 更新 index[file]
+删除文件 -> index.delete(file)
+重命名文件 -> index.delete(oldPath), scan-file(newPath)
+配置变化 -> 全量重新扫描
+```
+
+## 模块 6：导出报告
+
+支持格式：
+
+```text
+JSON
+Markdown
+CSV
+TXT
+```
+
+Markdown 报告示例：
+
+```markdown
+# TODO Report
+
+Scanned files: 1280
+Matched files: 37
+Total TODOs: 86
+
+## TODO
+
+- src/main.ts:18 TODO: refactor scanner client
+- src/tree.ts:44 TODO: improve grouping
+
+## FIXME
+
+- src/path.ts:12 FIXME: handle Windows path
+```
+
+原项目本身支持导出树内容，且配置了 exportPath；你的版本可以增强为多格式导出。
+
+# 七、性能优化设计
+
+## 1. 首次扫描优化
+
+```text
+- 使用 Rust ignore crate 遍历文件
+- 自动跳过 node_modules、dist、target、.git
+- 支持 .gitignore
+- 多线程扫描文件
+- 跳过二进制文件
+- 跳过超过阈值的大文件
+- 分批返回结果，避免 UI 卡死
+```
+
+## 2. 后续刷新优化
+
+```text
+- 文件未变化不重复扫描
+- 文件保存后只扫当前文件
+- 配置变化才触发全量扫描
+- 过滤和分组只操作内存索引
+```
+
+## 3. UI 渲染优化
+
+```text
+- TreeView 懒加载
+- 大量 TODO 时分页/折叠展示
+- 状态栏异步更新
+- 高亮延迟执行，避免输入时卡顿
+```
+
+# 八、Benchmark 方案
+
+比赛时必须有量化数据。建议准备三个测试仓库：
+
+```text
+小型仓库：100~500 文件
+中型仓库：1000~5000 文件
+大型仓库：10000+ 文件
+```
+
+测试指标：
+
+| 指标      | 说明                     |
+| ------- | ---------------------- |
+| 首次扫描耗时  | 打开 workspace 后完整扫描时间   |
+| 增量扫描耗时  | 修改单个文件后的更新时间           |
+| 内存占用    | 扫描期间峰值内存               |
+| UI 响应时间 | 刷新树视图耗时                |
+| 匹配准确率   | 与原 Todo Tree / rg 结果对比 |
+| 导出耗时    | 导出 TODO 报告耗时           |
+
+报告表格示例：
+
+| 场景           | 原 Todo Tree | Todo Tree Next |   提升 |
+| ------------ | ----------: | -------------: | ---: |
+| 500 文件首次扫描   |       320ms |          120ms | 2.6x |
+| 5000 文件首次扫描  |      2800ms |          730ms | 3.8x |
+| 10000 文件首次扫描 |      6200ms |         1450ms | 4.2x |
+| 修改单文件刷新      |      2800ms |           18ms | 155x |
+
+增量扫描是最容易做出巨大提升的数据点。
+
+# 九、代码量规划
+
+按赛道“有效代码不少于 2000 行”的要求，这个项目很稳。
+
+| 模块                 |    预计有效代码 |
+| ------------------ | --------: |
+| TypeScript 插件入口/命令 |   300~500 |
+| TreeView 展示        |   500~800 |
+| 高亮模块               |   300~500 |
+| 配置解析               |   300~500 |
+| 文件监听/增量更新          |   300~500 |
+| Rust 扫描器           |  700~1000 |
+| Rust 正则匹配/过滤       |   400~700 |
+| 导出模块               |   200~400 |
+| 测试代码               |  800~1500 |
+| Benchmark          |   200~400 |
+| 合计                 | 4000~6800 |
+
+不包含注释和空行，达到 3000 行以上完全没问题。
+
+# 十、开发阶段安排
+
+## 第一阶段：基础插件骨架，3~5 天
+
+目标：能在 VS Code 中运行插件。
+
+完成：
+
+```text
+- 创建 VS Code extension 项目
+- 注册 TreeView
+- 注册 refresh 命令
+- 显示 mock TODO 数据
+- 点击节点跳转文件
+- 状态栏显示 TODO 数量
+```
+
+产出：
+
+```text
+插件能打开
+侧边栏能显示 TODO 树
+点击能跳转
+```
+
+## 第二阶段：Rust 扫描器，5~7 天
+
+目标：Rust 能扫描真实项目。
+
+完成：
+
+```text
+- Rust CLI
+- workspace 遍历
+- TODO/FIXME/BUG 匹配
+- include/exclude 过滤
+- JSON 输出
+- 单文件扫描
+```
+
+产出：
+
+```bash
+todo-scanner scan-workspace --root ./project
+```
+
+能输出：
+
+```json
+{
+  "total_items": 42,
+  "items": [...]
+}
+```
+
+## 第三阶段：插件接入扫描器，5~7 天
+
+目标：VS Code 插件显示真实扫描结果。
+
+完成：
+
+```text
+- TypeScript 调用 Rust CLI
+- 解析 JSON
+- 渲染 TreeView
+- 支持工作区扫描
+- 支持当前文件扫描
+- 支持刷新
+```
+
+产出：
+
+```text
+真实项目中的 TODO 能显示在侧边栏
+点击能跳转到对应行列
+```
+
+## 第四阶段：高亮、配置和过滤，5~7 天
+
+目标：达到原项目核心体验。
+
+完成：
+
+```text
+- 编辑器 TODO 高亮
+- 自定义 tags
+- 自定义 include/exclude
+- 按 tag 分组
+- flat/tree/tag 三种视图
+- 状态栏统计
+```
+
+产出：
+
+```text
+具备完整可用性
+```
+
+## 第五阶段：增量索引和性能优化，7~10 天
+
+目标：体现重写价值。
+
+完成：
+
+```text
+- 文件保存后局部扫描
+- 文件删除/重命名后更新索引
+- 配置变化后全量重扫
+- 扫描缓存
+- 大仓库性能优化
+- benchmark
+```
+
+产出：
+
+```text
+有明显性能提升数据
+```
+
+## 第六阶段：文档、测试和演示，5~7 天
+
+目标：提交级作品。
+
+完成：
+
+```text
+- README
+- 架构文档
+- 使用文档
+- 配置文档
+- 单元测试
+- 集成测试
+- 性能测试报告
+- 演示 GIF/视频
+```
+
+# 十一、测试方案
+
+## Rust 单元测试
+
+测试：
+
+```text
+- 单行 TODO 匹配
+- FIXME/BUG/HACK 匹配
+- 大小写敏感/不敏感
+- Markdown task 匹配
+- include/exclude glob
+- .gitignore 忽略
+- 二进制文件跳过
+- 大文件跳过
+```
+
+## TypeScript 插件测试
+
+测试：
+
+```text
+- TreeProvider 数据构建
+- 点击 TODO 跳转
+- 配置读取
+- 状态栏更新
+- 高亮 Decoration 创建
+- 导出报告
+```
+
+## 集成测试
+
+准备 fixtures：
+
+```text
+fixtures/
+├── simple-project/
+├── markdown-project/
+├── large-project/
+└── git-project/
+```
+
+确保扫描结果和预期一致。
+
+# 十二、安全设计
+
+虽然这个项目不是安全软件，但要写安全性很重要。
+
+安全策略：
+
+```text
+1. 只读扫描，不修改用户代码
+2. 不执行被扫描文件中的任何内容
+3. Rust CLI 参数严格校验
+4. 防止路径穿越
+5. 默认遵循 .gitignore
+6. 默认跳过 node_modules、.git、dist、target
+7. 限制单文件最大扫描大小
+8. JSON 通信不拼接 shell 命令，避免命令注入
+9. 扫描失败只返回错误，不崩溃插件
+```
+
+TypeScript 调用 Rust CLI 时不要这样：
+
+```ts
+exec(`scanner --root ${rootPath}`)
+```
+
+要这样：
+
+```ts
+spawn(scannerPath, ["scan-workspace", "--root", rootPath])
+```
+
+这样可以避免路径中有特殊字符导致命令注入。
+
+# 十三、最终交付物
+
+建议最终提交包含：
+
+```text
+1. VS Code 插件源码
+2. Rust 扫描器源码
+3. README
+4. 架构设计文档
+5. 原项目对比说明
+6. 功能兼容列表
+7. 性能测试报告
+8. 单元测试和集成测试
+9. 演示视频/GIF
+10. 安装包 .vsix
+```
+
+README 结构建议：
+
+```markdown
+# Todo Tree Next
+
+## 项目简介
+## 与原 Todo Tree 的关系
+## 重写目标
+## 技术架构
+## 功能特性
+## 性能对比
+## 安装方式
+## 使用方式
+## 配置说明
+## 开发文档
+## 测试报告
+## 安全说明
+## 未来计划
+```
+
+# 十四、和原项目的对比写法
+
+可以这样写：
+
+| 维度            | 原 Todo Tree     | Todo Tree Next            |
+| ------------- | --------------- | ------------------------- |
+| 扫描方式          | 调用 ripgrep 搜索   | Rust 原生扫描器                |
+| 更新方式          | 偏全量刷新           | 增量索引更新                    |
+| 展示方式          | 树形/扁平/标签        | 保留并增强                     |
+| 高亮            | 支持丰富配置          | 保留核心高亮                    |
+| Markdown TODO | 需要配置 regex/tags | 默认原生支持                    |
+| Git 集成        | 较弱              | 支持 changed/staged TODO    |
+| 导出            | 支持导出树内容         | 支持 JSON/Markdown/CSV      |
+| 性能统计          | 不明显             | 内置扫描耗时统计                  |
+| 架构            | 插件逻辑和扫描耦合       | TypeScript UI + Rust Core |
+
+---
+
+# 十五、基于源码分析的补充分析
+
+> **补充分析说明**：本节基于对原项目源码的深入阅读和分析，补充重写方案中需要特别注意的问题和建议新增的功能特性。
+
+## 1. 原项目架构问题深度分析
+
+### 1.1 extension.js 职责过重
+
+原项目 `extension.js` 共 **1935 行**，承担了过多职责：
+
+| 职责 | 代码行数 | 应拆分模块 |
+|------|---------|-----------|
+| 插件激活和初始化 | ~100行 | `extension.ts` |
+| 命令注册 | ~400行 | `commands.ts` |
+| ripgrep 搜索调用 | ~200行 | `scannerClient.ts` |
+| 状态栏管理 | ~100行 | `statusBar.ts` |
+| 文件监听和刷新 | ~150行 | `fileWatcher.ts` |
+| 视图切换逻辑 | ~100行 | `viewManager.ts` |
+| 过滤逻辑 | ~150行 | `filterManager.ts` |
+| 配置迁移 | ~150行 | `migrator.ts` |
+| 其他杂项 | ~585行 | 各自模块 |
+
+**重写建议**：严格按职责拆分模块，每个模块不超过 300 行。
+
+### 1.2 模块间耦合的具体表现
+
+```javascript
+// 原项目模块依赖关系（紧耦合）
+extension.js -> tree.js -> config.js -> attributes.js
+extension.js -> ripgrep.js -> utils.js
+extension.js -> highlights.js -> config.js, utils.js, attributes.js, icons.js
+```
+
+**问题**：模块间相互依赖，难以独立测试和维护。
+
+**重写建议**：采用依赖注入模式
+
+```typescript
+// 新架构：依赖注入
+export class TodoExtension {
+  constructor(
+    private scanner: ScannerClient,
+    private treeProvider: TodoTreeProvider,
+    private highlightManager: DecorationManager,
+    private statusBar: StatusBarManager
+  ) {}
+}
+```
+
+### 1.3 ripgrep 进程启动开销
+
+原项目每次扫描都启动新的 ripgrep 进程：
+
+```javascript
+// ripgrep.js:167
+var currentProcess = child_process.exec( execString, { cwd, maxBuffer } );
+```
+
+**开销分析**：
+- 进程启动：~10-50ms
+- 进程间通信：~5-20ms
+- 进程销毁：~5-10ms
+- **总计**：每次扫描额外开销 20-80ms
+
+**重写建议**：考虑 WASM 方案，避免进程间通信
+
+```typescript
+// WASM 方案：零进程开销
+import init, { scan_workspace } from 'todo-scanner-wasm';
+await init();
+const result = scan_workspace(configJson); // 直接调用，无 IPC
+```
+
+### 1.4 全量刷新无增量
+
+原项目 `rebuild()` 函数每次都全量扫描：
+
+```javascript
+// extension.js:573-609
+function rebuild() {
+    searchResults.clear();      // 清空所有结果
+    searchList = [];
+    provider.clear(...);        // 清空树视图
+    // ... 全量重新扫描
+}
+```
+
+**影响**：
+- 修改 1 个文件后刷新：扫描整个工作区
+- 大型项目（10k+ 文件）：每次刷新需要数秒
+
+**重写建议**：增量索引 + 文件 Hash
+
+```typescript
+class IncrementalIndexer {
+  private fileHashes: Map<string, string> = new Map();
+
+  async shouldRescan(filePath: string): Promise<boolean> {
+    const content = await fs.readFile(filePath);
+    const hash = createHash('md5').update(content).digest('hex');
+    const cached = this.fileHashes.get(filePath);
+    return !cached || cached !== hash;
+  }
+}
+```
+
+### 1.5 Markdown 需手动配置
+
+原项目对 Markdown TODO 的支持需要用户手动配置：
+
+```javascript
+// extension.js:979-1025 - 复杂的迁移逻辑
+function checkForMarkdownUpgrade() {
+    // 检测用户是否使用旧的 regex 配置
+    // 弹出提示让用户手动更新
+}
+```
+
+**问题**：用户体验差，新用户不知道如何配置。
+
+**重写建议**：默认原生支持，无需配置
+
+```typescript
+// 默认内置 Markdown 任务匹配
+const MARKDOWN_TASK_REGEX = /^\s*[-*]\s*\[([ xX])\]\s+(.*)$/;
+```
+
+---
+
+## 2. 重写方案补足建议
+
+### 2.1 缓存持久化方案
+
+方案中提到"扫描缓存"但未详细说明持久化策略。建议使用 **VS Code Memento API**：
+
+```typescript
+interface CachedIndex {
+  workspaceHash: string;        // 工作区路径的 hash
+  lastScanTime: number;         // 上次扫描时间戳
+  version: string;              // 索引版本号
+  fileHashes: Record<string, string>;  // file -> content hash
+  todoItems: Record<string, TodoItem[]>;  // file -> todos
+}
+
+class PersistentIndexer {
+  constructor(private context: vscode.ExtensionContext) {}
+
+  async loadCache(): Promise<CachedIndex | null> {
+    return this.context.workspaceState.get<CachedIndex>('todoIndex');
+  }
+
+  async saveCache(index: CachedIndex): Promise<void> {
+    await this.context.workspaceState.update('todoIndex', index);
+  }
+}
+```
+
+**价值**：二次启动工作区时，从缓存加载只需 ~10ms，而非重新扫描数秒。
+
+### 2.2 WASM 替代 CLI 子进程的可行性
+
+| 对比维度 | CLI 子进程 | WASM |
+|---------|-----------|------|
+| 启动开销 | 20-80ms | <1ms |
+| 类型安全 | JSON 序列化/反序列化 | 直接类型映射 |
+| 错误处理 | 需解析 stderr | 直接抛出异常 |
+| 跨平台 | 需编译不同二进制 | 统一 .wasm 文件 |
+| 调试 | 较难 | 可用 Chrome DevTools |
+| 包大小 | ~5-10MB | ~1-2MB |
+
+**建议**：优先考虑 WASM 方案，CLI 作为降级方案。
+
+```typescript
+// 双模式支持
+let scanner: ScannerInterface;
+
+if (await isWasmSupported()) {
+  scanner = new WasmScanner();  // 优先使用 WASM
+} else {
+  scanner = new CliScanner();   // 降级到 CLI
+}
+```
+
+### 2.3 配置迁移工具设计
+
+原项目有 **50+ 配置项**，用户迁移成本高。建议提供自动迁移工具：
+
+```typescript
+export class ConfigMigrator {
+  // 配置项映射表
+  private static readonly MAPPING: Record<string, string> = {
+    'todo-tree.general.tags': 'todoTreeNext.general.tags',
+    'todo-tree.general.rootFolder': 'todoTreeNext.general.rootFolder',
+    'todo-tree.regex.regex': 'todoTreeNext.regex.regex',
+    'todo-tree.filtering.includeGlobs': 'todoTreeNext.filtering.includeGlobs',
+    'todo-tree.filtering.excludeGlobs': 'todoTreeNext.filtering.excludeGlobs',
+    'todo-tree.highlights.enabled': 'todoTreeNext.highlights.enabled',
+    'todo-tree.highlights.defaultHighlight': 'todoTreeNext.highlights.defaultHighlight',
+    'todo-tree.tree.scanMode': 'todoTreeNext.tree.scanMode',
+    // ... 更多映射
+  };
+
+  async migrate(): Promise<MigrationResult> {
+    const originalConfig = vscode.workspace.getConfiguration('todo-tree');
+    const newConfig = vscode.workspace.getConfiguration('todoTreeNext');
+
+    const results: MigrationResult = { migrated: [], skipped: [], errors: [] };
+
+    for (const [oldKey, newKey] of Object.entries(ConfigMigrator.MAPPING)) {
+      const value = originalConfig.inspect(this.getSettingName(oldKey));
+      if (value?.globalValue !== undefined) {
+        await newConfig.update(this.getSettingName(newKey), value.globalValue, vscode.ConfigurationTarget.Global);
+        results.migrated.push(oldKey);
+      }
+    }
+
+    return results;
+  }
+}
+
+// 注册迁移命令
+vscode.commands.registerCommand('todoTreeNext.migrateFromOriginal', async () => {
+  const migrator = new ConfigMigrator();
+  const result = await migrator.migrate();
+  vscode.window.showInformationMessage(
+    `Migration complete: ${result.migrated.length} settings migrated`
+  );
+});
+```
+
+### 2.4 增量索引的文件 Hash 策略
+
+```typescript
+import { createHash } from 'crypto';
+import { promisify } from 'util';
+import { readFile } from 'fs/promises';
+
+export class FileHasher {
+  private cache: Map<string, { hash: string; mtime: number }> = new Map();
+
+  async getFileHash(filePath: string): Promise<string> {
+    const stat = await fs.stat(filePath);
+    const cached = this.cache.get(filePath);
+
+    // 快速路径：如果修改时间未变化，直接返回缓存的 hash
+    if (cached && cached.mtime === stat.mtimeMs) {
+      return cached.hash;
+    }
+
+    // 慢速路径：读取文件计算 hash
+    const content = await readFile(filePath);
+    const hash = createHash('md5').update(content).digest('hex');
+
+    this.cache.set(filePath, { hash, mtime: stat.mtimeMs });
+    return hash;
+  }
+
+  async hasChanged(filePath: string): Promise<boolean> {
+    const currentHash = await this.getFileHash(filePath);
+    const cachedHash = this.index.fileHashes[filePath];
+    return currentHash !== cachedHash;
+  }
+}
+```
+
+### 2.5 错误恢复机制
+
+Rust 扫描器需要完善的错误处理：
+
+```rust
+#[derive(Debug)]
+pub enum ScanError {
+    IoError(std::io::Error),
+    RegexError(regex::Error),
+    JsonError(serde_json::Error),
+    PathTraversalAttempt(String),
+    FileTooLarge(String, u64),
+}
+
+impl Scanner {
+    pub fn scan_file(&self, path: &Path) -> Result<Vec<TodoItem>, ScanError> {
+        // 1. 路径安全检查
+        if self.is_path_traversal(path) {
+            return Err(ScanError::PathTraversalAttempt(path.display().to_string()));
+        }
+
+        // 2. 文件大小检查
+        let metadata = fs::metadata(path)?;
+        if metadata.len() > self.config.max_file_size {
+            return Err(ScanError::FileTooLarge(path.display().to_string(), metadata.len()));
+        }
+
+        // 3. 读取文件（优雅处理二进制文件）
+        let content = match fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(e) if e.kind() == std::io::ErrorKind::InvalidData => {
+                return Ok(vec![]); // 跳过二进制文件
+            }
+            Err(e) => return Err(ScanError::IoError(e)),
+        };
+
+        // 4. 正则匹配
+        let todos = self.match_todos(&content, path)?;
+        Ok(todos)
+    }
+}
+```
+
+---
+
+## 3. 建议新功能一：TODO 优先级管理
+
+### 3.1 功能概述
+
+为 TODO 项添加优先级标记，支持按优先级排序、过滤和统计。
+
+### 3.2 数据结构设计
+
+```typescript
+export type TodoPriority = 'P0' | 'P1' | 'P2' | 'P3' | 'none';
+
+export interface TodoItem {
+  // 现有字段
+  file: string;
+  line: number;
+  column: number;
+  tag: string;
+  text: string;
+
+  // 新增字段
+  priority: TodoPriority;
+  assignee?: string;      // @username
+  dueDate?: Date;         // due:2026-06-01
+  labels?: string[];      // #backend #performance
+  createdAt?: number;     // 创建时间戳
+}
+
+export interface PriorityStats {
+  P0: number;  // 紧急
+  P1: number;  // 高
+  P2: number;  // 中
+  P3: number;  // 低
+  none: number; // 未标记
+}
+```
+
+### 3.3 支持的语法格式
+
+```javascript
+// 基础优先级标记
+// TODO:P0 fix critical bug
+// FIXME:P1 memory leak
+// HACK:P2 workaround
+
+// 完整语法（优先级 + 负责人 + 截止日期 + 标签）
+// TODO:P0 fix auth bug @alice due:2026-06-01 #security #urgent
+// FIXME:P2 handle edge case @bob #backend
+
+// 简写形式
+// TODO! 紧急任务 (等同于 P0)
+// TODO? 需要确认 (等同于 P2)
+```
+
+### 3.4 正则匹配实现
+
+```rust
+// Rust 扫描器中的优先级解析
+lazy_static! {
+    static ref PRIORITY_REGEX: Regex = Regex::new(
+        r"(?x)
+        (?:TODO|FIXME|HACK|BUG|NOTE)  # 标签
+        (?:                            # 可选的优先级
+            :?\s*
+            (?P<priority>P[0-3]|!)
+        )?
+        \s+
+        (?P<text>.*?)
+        (?:
+            \s+@(?P<assignee>\w+)      # 可选的负责人
+        )?
+        (?:
+            \s+due:(?P<due>\d{4}-\d{2}-\d{2})  # 可选的截止日期
+        )?
+        (?:
+            \s+#(?P<label>\w+)+        # 可选的标签
+        )?
+        "
+    ).unwrap();
+}
+
+pub fn parse_todo(text: &str) -> Option<TodoItem> {
+    let caps = PRIORITY_REGEX.captures(text)?;
+
+    Some(TodoItem {
+        priority: caps.name("priority")
+            .map(|m| match m.as_str() {
+                "P0" | "!" => TodoPriority::P0,
+                "P1" => TodoPriority::P1,
+                "P2" | "?" => TodoPriority::P2,
+                "P3" => TodoPriority::P3,
+                _ => TodoPriority::None,
+            })
+            .unwrap_or(TodoPriority::None),
+        assignee: caps.name("assignee").map(|m| m.as_str().to_string()),
+        due_date: caps.name("due").and_then(|m| NaiveDate::parse_from_str(m.as_str(), "%Y-%m-%d").ok()),
+        labels: caps.name("label").map(|m| m.as_str().to_string()).into_iter().collect(),
+        text: caps.name("text")?.as_str().to_string(),
+        // ... 其他字段
+    })
+}
+```
+
+### 3.5 优先级统计和过滤命令
+
+```typescript
+// 注册优先级相关命令
+export function registerPriorityCommands(context: vscode.ExtensionContext) {
+  // 按优先级过滤
+  context.subscriptions.push(
+    vscode.commands.registerCommand('todoTreeNext.filterByPriority', async () => {
+      const priorities = ['P0 (Urgent)', 'P1 (High)', 'P2 (Medium)', 'P3 (Low)', 'None'];
+      const selected = await vscode.window.showQuickPick(priorities, {
+        placeHolder: 'Select priority to filter'
+      });
+      if (selected) {
+        const priority = selected.split(' ')[0] as TodoPriority;
+        treeProvider.filterByPriority(priority);
+      }
+    })
+  );
+
+  // 显示优先级统计
+  context.subscriptions.push(
+    vscode.commands.registerCommand('todoTreeNext.showPriorityStats', () => {
+      const stats = indexer.getPriorityStats();
+      const message = [
+        `P0 (Urgent): ${stats.P0}`,
+        `P1 (High): ${stats.P1}`,
+        `P2 (Medium): ${stats.P2}`,
+        `P3 (Low): ${stats.P3}`,
+        `No Priority: ${stats.none}`
+      ].join('\n');
+
+      vscode.window.showInformationMessage('TODO Priority Stats', { modal: true, detail: message });
+    })
+  );
+
+  // 按优先级排序切换
+  context.subscriptions.push(
+    vscode.commands.registerCommand('todoTreeNext.togglePrioritySort', () => {
+      treeProvider.toggleSortByPriority();
+    })
+  );
+}
+```
+
+### 3.6 优先级图标和颜色配置
+
+```json
+{
+  "todoTreeNext.priority.icons": {
+    "P0": { "icon": "alert", "color": "#FF0000" },
+    "P1": { "icon": "flame", "color": "#FF6600" },
+    "P2": { "icon": "info", "color": "#FFCC00" },
+    "P3": { "icon": "note", "color": "#00CC00" },
+    "none": { "icon": "circle-outline", "color": "#999999" }
+  }
+}
+```
+
+---
+
+## 4. 建议新功能二：可视化统计仪表盘
+
+### 4.1 功能概述
+
+使用 VS Code Webview API 创建交互式仪表盘，可视化展示 TODO 统计信息。
+
+### 4.2 展示内容
+
+| 图表类型 | 展示内容 | 用途 |
+|---------|---------|------|
+| 趋势图 | 最近 30 天 TODO 数量变化 | 追踪项目债务趋势 |
+| 饼图 | 按标签分布（TODO/FIXME/BUG 等） | 了解债务类型构成 |
+| 柱状图 | 按优先级分布 | 快速识别紧急任务 |
+| 热力图 | 按文件/目录分布 | 发现问题集中区域 |
+| 列表 | 最旧的 TODO Top 10 | 清理长期债务 |
+| 时间线 | TODO 创建时间线 | 分析债务引入模式 |
+
+### 4.3 Webview 实现
+
+```typescript
+export class TodoDashboard {
+  private panel: vscode.WebviewPanel | undefined;
+
+  constructor(
+    private context: vscode.ExtensionContext,
+    private indexer: TodoIndexer
+  ) {}
+
+  async show(): Promise<void> {
+    if (this.panel) {
+      this.panel.reveal();
+      return;
+    }
+
+    this.panel = vscode.window.createWebviewPanel(
+      'todoDashboard',
+      'TODO Dashboard',
+      vscode.ViewColumn.One,
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true
+      }
+    );
+
+    this.panel.webview.html = await this.getHtml();
+
+    // 处理来自 Webview 的消息
+    this.panel.webview.onDidReceiveMessage(async (message) => {
+      switch (message.command) {
+        case 'refresh':
+          await this.refreshData();
+          break;
+        case 'export':
+          await this.exportReport(message.format);
+          break;
+        case 'filterByTag':
+          this.indexer.filterByTag(message.tag);
+          break;
+      }
+    });
+
+    this.panel.onDidDispose(() => {
+      this.panel = undefined;
+    });
+  }
+
+  private async getHtml(): Promise<string> {
+    const stats = await this.indexer.getStats();
+
+    return `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TODO Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: var(--vscode-font-family);
+            color: var(--vscode-foreground);
+            background: var(--vscode-editor-background);
+            padding: 20px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .card {
+            background: var(--vscode-editor-inactiveSelectionBackground);
+            border-radius: 8px;
+            padding: 16px;
+        }
+        .card h3 {
+            margin-top: 0;
+            color: var(--vscode-textLink-foreground);
+        }
+        .stat-number {
+            font-size: 48px;
+            font-weight: bold;
+            color: var(--vscode-textLink-foreground);
+        }
+        .toolbar {
+            margin-bottom: 20px;
+        }
+        button {
+            background: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: var(--vscode-button-hoverBackground);
+        }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <button onclick="refreshData()">Refresh</button>
+        <button onclick="exportReport('json')">Export JSON</button>
+        <button onclick="exportReport('markdown')">Export Markdown</button>
+    </div>
+
+    <div class="grid">
+        <!-- 概览卡片 -->
+        <div class="card">
+            <h3>Total TODOs</h3>
+            <div class="stat-number">${stats.total}</div>
+            <div>Across ${stats.fileCount} files</div>
+        </div>
+
+        <!-- 标签分布饼图 -->
+        <div class="card">
+            <h3>Distribution by Tag</h3>
+            <canvas id="tagChart"></canvas>
+        </div>
+
+        <!-- 优先级分布柱状图 -->
+        <div class="card">
+            <h3>Distribution by Priority</h3>
+            <canvas id="priorityChart"></canvas>
+        </div>
+
+        <!-- 趋势图 -->
+        <div class="card" style="grid-column: span 2;">
+            <h3>Trend (Last 30 Days)</h3>
+            <canvas id="trendChart"></canvas>
+        </div>
+
+        <!-- 文件热力图 -->
+        <div class="card">
+            <h3>Top Files with TODOs</h3>
+            <div id="heatmap"></div>
+        </div>
+
+        <!-- 最旧的 TODO -->
+        <div class="card">
+            <h3>Oldest TODOs</h3>
+            <div id="oldestList"></div>
+        </div>
+    </div>
+
+    <script>
+        const vscode = acquireVsCodeApi();
+        const stats = ${JSON.stringify(stats)};
+
+        // 标签分布饼图
+        new Chart(document.getElementById('tagChart'), {
+            type: 'pie',
+            data: {
+                labels: Object.keys(stats.byTag),
+                datasets: [{
+                    data: Object.values(stats.byTag),
+                    backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF']
+                }]
+            }
+        });
+
+        // 优先级分布柱状图
+        new Chart(document.getElementById('priorityChart'), {
+            type: 'bar',
+            data: {
+                labels: ['P0', 'P1', 'P2', 'P3', 'None'],
+                datasets: [{
+                    label: 'Count',
+                    data: [stats.priority.P0, stats.priority.P1, stats.priority.P2, stats.priority.P3, stats.priority.none],
+                    backgroundColor: ['#FF0000', '#FF6600', '#FFCC00', '#00CC00', '#999999']
+                }]
+            }
+        });
+
+        // 趋势图
+        new Chart(document.getElementById('trendChart'), {
+            type: 'line',
+            data: {
+                labels: stats.trend.map(t => t.date),
+                datasets: [{
+                    label: 'TODOs',
+                    data: stats.trend.map(t => t.count),
+                    borderColor: '#36A2EB',
+                    fill: false
+                }]
+            }
+        });
+
+        function refreshData() {
+            vscode.postMessage({ command: 'refresh' });
+        }
+
+        function exportReport(format) {
+            vscode.postMessage({ command: 'export', format });
+        }
+    </script>
+</body>
+</html>`;
+  }
+}
+```
+
+### 4.4 统计数据收集
+
+```typescript
+export interface DashboardStats {
+  total: number;
+  fileCount: number;
+  byTag: Record<string, number>;
+  byPriority: Record<TodoPriority, number>;
+  topFiles: Array<{ file: string; count: number }>;
+  oldest: Array<{ file: string; line: number; text: string; age: number }>;
+  trend: Array<{ date: string; count: number }>;
+}
+
+export class TodoIndexer {
+  async getStats(): Promise<DashboardStats> {
+    const allTodos = this.getAllTodos();
+
+    return {
+      total: allTodos.length,
+      fileCount: new Set(allTodos.map(t => t.file)).size,
+      byTag: this.groupBy(allTodos, 'tag'),
+      byPriority: this.groupBy(allTodos, 'priority'),
+      topFiles: this.getTopFiles(allTodos, 10),
+      oldest: this.getOldest(allTodos, 10),
+      trend: await this.getTrend(30)
+    };
+  }
+
+  private groupBy(items: TodoItem[], key: string): Record<string, number> {
+    return items.reduce((acc, item) => {
+      const value = item[key] || 'unknown';
+      acc[value] = (acc[value] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+  }
+
+  private async getTrend(days: number): Promise<Array<{ date: string; count: number }>> {
+    // 从 git 历史或缓存中获取趋势数据
+    // 这里简化为返回模拟数据
+    const trend = [];
+    const now = new Date();
+    for (let i = days; i >= 0; i--) {
+      const date = new Date(now);
+      date.setDate(date.getDate() - i);
+      trend.push({
+        date: date.toISOString().split('T')[0],
+        count: await this.getCountAtDate(date)
+      });
+    }
+    return trend;
+  }
+}
+```
+
+### 4.5 仪表盘命令注册
+
+```typescript
+export function registerDashboardCommands(context: vscode.ExtensionContext) {
+  const dashboard = new TodoDashboard(context, indexer);
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('todoTreeNext.showDashboard', () => {
+      dashboard.show();
+    })
+  );
+
+  // 在 TreeView 标题栏添加仪表盘按钮
+  // package.json 中配置：
+  // {
+  //   "command": "todoTreeNext.showDashboard",
+  //   "title": "Dashboard",
+  //   "icon": "$(dashboard)"
+  // }
+}
+```
+
+### 4.6 快捷操作
+
+仪表盘支持以下交互：
+
+- **点击饼图某部分**：自动过滤显示该标签的 TODO
+- **点击文件名**：跳转到对应文件
+- **点击 TODO 项**：跳转到对应位置
+- **导出按钮**：导出当前视图为 JSON/Markdown/CSV
+- **刷新按钮**：重新计算统计数据
+
+---
+
+## 5. 补充的 Benchmark 测试场景
+
+原方案的 Benchmark 方案已经很好，建议补充以下场景：
+
+| 场景 | 说明 | 测试目的 |
+|------|------|---------|
+| 冷启动（有缓存） | 二次打开同一工作区 | 验证缓存持久化效果 |
+| 大量小文件 | 10000+ 文件，每个只有 1-2 个 TODO | 测试索引内存占用 |
+| 超大文件 | 单文件 10MB+ 的日志文件 | 测试大文件跳过策略 |
+| 深层目录 | 20+ 层嵌套目录结构 | 测试路径处理性能 |
+| 符号链接 | 包含大量符号链接的工作区 | 测试链接解析和循环检测 |
+| 高频更新 | 1 秒内保存 10+ 次文件 | 测试防抖和增量更新 |
+| 并发扫描 | 多个工作区同时扫描 | 测试并发处理能力 |
+| 优先级解析 | 包含复杂优先级标记的代码 | 测试正则匹配性能 |
+
+---
+
+## 6. 总结
+
+本补充分析基于对原项目源码的深入阅读，识别了以下关键问题：
+
+1. **架构层面**：职责过重、模块耦合、缺乏增量机制
+2. **性能层面**：进程启动开销、全量刷新、无缓存持久化
+3. **体验层面**：Markdown 配置复杂、过滤功能简单
+
+建议的两个新功能：
+
+1. **优先级管理**：通过简单语法标记 TODO 优先级，支持按优先级排序、过滤和统计
+2. **可视化仪表盘**：使用 Webview 创建交互式统计面板，直观展示项目 TODO 状态
+
+这些补充将使重写方案更加完整和具有竞争力。
+
