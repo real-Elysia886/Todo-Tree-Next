@@ -1,7 +1,7 @@
 {
-    "todo-tree.activitybar.title": "待办事项",
-    "todo-tree.container.name": "待办事项",
-    "todo-tree.command.category": "待办事项",
+    "todo-tree.activitybar.title": "Todo Tree Next",
+    "todo-tree.container.name": "Todo Tree Next",
+    "todo-tree.command.category": "Todo Tree",
     "todo-tree.command.showFlatView.title": "显示平直树状图",
     "todo-tree.command.showTagsOnlyView.title": "仅显示标签",
     "todo-tree.command.showTreeView.title": "显示树状图",

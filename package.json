@@ -1,21 +1,23 @@
 {
-    "name": "todo-tree",
-    "displayName": "Todo Tree",
-    "description": "Show TODO, FIXME, etc. comment tags in a tree view",
+    "name": "todo-tree-next",
+    "displayName": "Todo Tree Next",
+    "description": "Modern TODO/FIXME scanner with Rust core — fast, incremental, with smart filtering and Git integration",
     "keywords": [
         "todo",
+        "fixme",
         "task",
-        "tasklist",
+        "rust",
+        "scanner",
         "multi-root ready"
     ],
-    "version": "0.0.224",
+    "version": "1.0.0",
     "license": "MIT",
     "icon": "resources/todo-tree.png",
-    "publisher": "Gruntfuggly",
+    "publisher": "real-Elysia886",
     "engines": {
         "vscode": "^1.120.0"
     },
-    "repository": "https://github.com/Gruntfuggly/todo-tree",
+    "repository": "https://github.com/real-Elysia886/new-todo-tree",
     "bugs": {
         "url": "https://github.com/Gruntfuggly/todo-tree/issues",
         "email": "gruntfuggly@googlemail.com"
