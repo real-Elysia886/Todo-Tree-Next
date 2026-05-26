@@ -1,5 +1,22 @@
 # Todo Tree Change Log
 
+## v1.1.0 - 2026-05-26
+
+- Publish under the Todo Tree_Next marketplace identity.
+- Add agent-facing TODO context commands for structured task data and inline agent findings.
+- Add Git-aware TODO metadata, debt report export, changed-file scans, and staged-file scans.
+- Improve dashboard data refresh after trend collection.
+- Harden ripgrep execution by using argument arrays instead of shell command strings.
+- Fix several stability issues around icon validation, workspace folder expansion, submodule globs, and filtering configuration lookup.
+
+## v1.0.0 - 2026-05-26
+
+- Rework the extension around a faster Rust scanner with ripgrep fallback.
+- Start modularizing the extension into command, watcher, status bar, export, dashboard, Git, and agent-facing modules.
+- Add an explicit `TodoItem` data model for richer TODO metadata.
+- Add dashboard, smart filtering, Git status enrichment, priority and ownership fields, due dates, context snippets, and recommended ordering data.
+- Add Chinese and English README updates for the rewritten project.
+
 ## v0.0.224 - 2023-02-09
 
 - Remove filewatcher functionality

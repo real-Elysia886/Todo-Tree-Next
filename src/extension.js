@@ -7,7 +7,6 @@ var path = require( 'path' );
 var fs = require( 'fs' );
 var crypto = require( 'crypto' );
 var child_process = require( 'child_process' );
-var os = require( 'os' );
 
 var tree = require( "./tree" );
 var colours = require( './colours.js' );
@@ -28,6 +27,7 @@ var configMigrator = require( './configMigrator' );
 var scopeManager = require( './scopeManager' );
 var debtReport = require( './debtReport' );
 var agentInterface = require( './agentInterface' );
+var storagePath = require( './storagePath' );
 
 var searchList = [];
 var currentFilter;
@@ -258,7 +258,7 @@ function activate( context )
     function getOptions( filename )
     {
         var c = vscode.workspace.getConfiguration( 'todo-tree' );
-        var storagePath = getStoragePath();
+        var localStoragePath = storagePath.getStoragePath( context );
 
         var tempIncludeGlobs = context.workspaceState.get( 'includeGlobs' ) || [];
         var tempExcludeGlobs = context.workspaceState.get( 'excludeGlobs' ) || [];
@@ -287,10 +287,10 @@ function activate( context )
             options.filename = filename;
         }
 
-        if( storagePath && !fs.existsSync( storagePath ) )
+        if( localStoragePath && !fs.existsSync( localStoragePath ) )
         {
-            debug( "Attempting to create local storage folder " + storagePath );
-            fs.mkdirSync( storagePath, { recursive: true } );
+            debug( "Attempting to create local storage folder " + localStoragePath );
+            fs.mkdirSync( localStoragePath, { recursive: true } );
         }
 
         options.outputChannel = outputChannel;
@@ -298,10 +298,10 @@ function activate( context )
         options.maxBuffer = c.get( 'ripgrep.ripgrepMaxBuffer' );
         options.multiline = utils.getRegexSource().indexOf( "\\n" ) > -1 || c.get( 'regex.enableMultiLine' ) === true;
 
-        if( storagePath && fs.existsSync( storagePath ) === true && c.get( 'ripgrep.usePatternFile' ) === true )
+        if( localStoragePath && fs.existsSync( localStoragePath ) === true && c.get( 'ripgrep.usePatternFile' ) === true )
         {
             var patternFileName = crypto.randomBytes( 6 ).readUIntLE( 0, 6 ).toString( 36 ) + '.txt';
-            options.patternFilePath = path.join( storagePath, patternFileName );
+            options.patternFilePath = path.join( localStoragePath, patternFileName );
         }
 
         if( c.get( 'filtering.includeHiddenFiles' ) )
@@ -317,23 +317,6 @@ function activate( context )
         options.maxFileSize = vscode.workspace.getConfiguration( 'todo-tree.scanner' ).get( 'maxFileSize', 1024 * 1024 );
 
         return options;
-    }
-
-    function getStoragePath()
-    {
-        if( context.storageUri && context.storageUri.fsPath )
-        {
-            return context.storageUri.fsPath;
-        }
-        if( context.storagePath )
-        {
-            return context.storagePath;
-        }
-        if( context.globalStorageUri && context.globalStorageUri.fsPath )
-        {
-            return context.globalStorageUri.fsPath;
-        }
-        return path.join( os.tmpdir(), 'todo-tree' );
     }
 
     function searchWorkspaces( searchList )
@@ -396,7 +379,7 @@ function activate( context )
                 .finally( () =>
                 {
                     debug( "Found " + searchResults.count() + " items" );
-                    if( vscode.workspace.getConfiguration( 'todo-tree.ripgrep' ).get( 'passGlobsToRipgrep' ) !== true )
+                    if( vscode.workspace.getConfiguration( 'todo-tree.filtering' ).get( 'passGlobsToRipgrep' ) !== true )
                     {
                         applyGlobs();
                     }
@@ -439,9 +422,9 @@ function activate( context )
             rootFolders.push( vscode.Uri.file( rootFolder ).fsPath );
         }
 
-        rootFolders.forEach( function( rootFolder )
+        rootFolders = rootFolders.map( function( rootFolder )
         {
-            rootFolder = utils.replaceEnvironmentVariables( rootFolder );
+            return utils.replaceEnvironmentVariables( rootFolder );
         } );
 
         var includes = vscode.workspace.getConfiguration( 'todo-tree.filtering' ).get( 'includedWorkspaces', [] );
@@ -483,7 +466,7 @@ function activate( context )
 
         if( config.shouldIgnoreGitSubmodules() )
         {
-            submoduleExcludeGlobs = [];
+            var submoduleExcludeGlobs = [];
             searchList.forEach( function( rootPath )
             {
                 submoduleExcludeGlobs = submoduleExcludeGlobs.concat( utils.getSubmoduleExcludeGlobs( rootPath ) );
@@ -513,7 +496,7 @@ function activate( context )
             {
                 vscode.workspace.workspaceFolders.map( function( folder )
                 {
-                    child_process.exec( "git rev-parse HEAD", { cwd: folder.uri.fsPath }, ( err, stdout, stderr ) =>
+                    child_process.execFile( "git", [ "rev-parse", "HEAD" ], { cwd: folder.uri.fsPath }, ( err, stdout, stderr ) =>
                     {
                         var gitHead = stdout.toString();
                         if( lastGitHead[ folder.uri.fsPath ] !== undefined && gitHead != lastGitHead[ folder.uri.fsPath ] )
@@ -1150,7 +1133,7 @@ function activate( context )
             context.globalState.update( 'migratedVersion', undefined );
             context.globalState.update( 'ignoreMarkdownUpdate', undefined );
 
-            purgeFolder( getStoragePath() );
+            purgeFolder( storagePath.getStoragePath( context ) );
             purgeFolder( context.globalStorageUri && context.globalStorageUri.fsPath );
         } ) );
 

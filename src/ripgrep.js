@@ -94,7 +94,6 @@ module.exports.search = function ripGrep( cwd, options )
     options.globs = options.globs || [];
 
     var rgPath = options.rgPath;
-    var isWin = /^win/.test( process.platform );
 
     if( !fs.existsSync( rgPath ) )
     {
@@ -105,19 +104,11 @@ module.exports.search = function ripGrep( cwd, options )
         return Promise.reject( { error: "root folder not found (" + cwd + ")" } );
     }
 
-    if( isWin )
-    {
-        rgPath = '"' + rgPath + '"';
-    }
-    else
-    {
-        rgPath = rgPath.replace( / /g, '\\ ' );
-    }
-
-    let execString = rgPath + ' --no-messages --vimgrep -H --column --line-number --color never ' + options.additional;
+    var args = [ '--no-messages', '--vimgrep', '-H', '--column', '--line-number', '--color', 'never' ];
+    args = args.concat( splitArgs( options.additional || '' ) );
     if( options.multiline )
     {
-        execString += " -U ";
+        args.push( '-U' );
     }
 
     if( options.patternFilePath )
@@ -126,37 +117,37 @@ module.exports.search = function ripGrep( cwd, options )
         fs.writeFileSync( options.patternFilePath, options.unquotedRegex + '\n' );
     }
 
-    if( !fs.existsSync( options.patternFilePath ) )
+    if( !options.patternFilePath || !fs.existsSync( options.patternFilePath ) )
     {
         debug( "No pattern file found - passing regex in command" );
-        execString = `${execString} -e ${options.regex}`;
+        args.push( '-e', options.unquotedRegex || stripOuterQuotes( options.regex ) );
     }
     else
     {
-        execString = `${execString} -f \"${options.patternFilePath}\"`;
+        args.push( '-f', options.patternFilePath );
         debug( "Pattern:" + options.unquotedRegex );
     }
 
-    execString = options.globs.reduce( ( command, glob ) =>
+    options.globs.forEach( ( glob ) =>
     {
-        return `${command} -g \"${glob}\"`;
-    }, execString );
+        args.push( '-g', glob );
+    } );
 
     if( options.filename )
     {
         var filename = options.filename;
-        if( isWin && filename.slice( -1 ) === "\\" )
+        if( /^win/.test( process.platform ) && filename.slice( -1 ) === "\\" )
         {
-            filename = filename.substr( 0, filename.length - 1 );
+            filename = filename.substring( 0, filename.length - 1 );
         }
-        execString += " \"" + filename + "\"";
+        args.push( filename );
     }
     else
     {
-        execString += " .";
+        args.push( "." );
     }
 
-    debug( "Command: " + execString );
+    debug( "Command: " + rgPath + " " + args.map( quoteArgForLog ).join( " " ) );
 
     return new Promise( function( resolve, reject )
     {
@@ -164,7 +155,7 @@ module.exports.search = function ripGrep( cwd, options )
         // We'll explicitly give that here if a custom value is not provided.
         // Note that our options value is in KB, so we have to convert to bytes.
         const maxBuffer = ( options.maxBuffer || 200 ) * 1024;
-        var currentProcess = child_process.exec( execString, { cwd, maxBuffer } );
+        currentProcess = child_process.execFile( rgPath, args, { cwd, maxBuffer } );
         var results = "";
 
         currentProcess.stdout.on( 'data', function( data )
@@ -176,7 +167,7 @@ module.exports.search = function ripGrep( cwd, options )
         currentProcess.stderr.on( 'data', function( data )
         {
             debug( "Search failed:\n" + data );
-            if( fs.existsSync( options.patternFilePath ) === true )
+            if( options.patternFilePath && fs.existsSync( options.patternFilePath ) === true )
             {
                 fs.unlinkSync( options.patternFilePath );
             }
@@ -185,7 +176,8 @@ module.exports.search = function ripGrep( cwd, options )
 
         currentProcess.on( 'close', function( code )
         {
-            if( fs.existsSync( options.patternFilePath ) === true )
+            currentProcess = undefined;
+            if( options.patternFilePath && fs.existsSync( options.patternFilePath ) === true )
             {
                 fs.unlinkSync( options.patternFilePath );
             }
@@ -194,6 +186,83 @@ module.exports.search = function ripGrep( cwd, options )
 
     } );
 };
+
+function splitArgs( text )
+{
+    var args = [];
+    var current = "";
+    var quote;
+    var escaped = false;
+
+    text.split( "" ).forEach( function( char )
+    {
+        if( escaped )
+        {
+            current += char;
+            escaped = false;
+        }
+        else if( char === "\\" )
+        {
+            escaped = true;
+        }
+        else if( quote )
+        {
+            if( char === quote )
+            {
+                quote = undefined;
+            }
+            else
+            {
+                current += char;
+            }
+        }
+        else if( char === '"' || char === "'" )
+        {
+            quote = char;
+        }
+        else if( /\s/.test( char ) )
+        {
+            if( current.length > 0 )
+            {
+                args.push( current );
+                current = "";
+            }
+        }
+        else
+        {
+            current += char;
+        }
+    } );
+
+    if( escaped )
+    {
+        current += "\\";
+    }
+    if( current.length > 0 )
+    {
+        args.push( current );
+    }
+    return args;
+}
+
+function stripOuterQuotes( text )
+{
+    if( typeof text !== "string" )
+    {
+        return "";
+    }
+    if( ( text[ 0 ] === '"' && text[ text.length - 1 ] === '"' ) ||
+        ( text[ 0 ] === "'" && text[ text.length - 1 ] === "'" ) )
+    {
+        return text.substring( 1, text.length - 1 );
+    }
+    return text;
+}
+
+function quoteArgForLog( arg )
+{
+    return /\s/.test( arg ) ? '"' + arg.replace( /"/g, '\\"' ) + '"' : arg;
+}
 
 module.exports.kill = function()
 {
@@ -247,3 +316,9 @@ class Match
 }
 
 module.exports.Match = Match;
+
+module.exports.__test = {
+    splitArgs,
+    stripOuterQuotes,
+    quoteArgForLog
+};

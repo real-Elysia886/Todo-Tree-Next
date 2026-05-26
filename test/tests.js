@@ -9,6 +9,8 @@ var searchResults = require( '../src/searchResults.js' );
 var filterQuery = require( '../src/filterQuery.ts' );
 var gitFiles = require( '../src/gitFiles.ts' );
 
+QUnit.module( 'utils and legacy modules' );
+
 QUnit.test( "utils.isHexColour", function( assert )
 {
     assert.ok( utils.isHexColour( {} ) === false );

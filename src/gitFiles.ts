@@ -34,10 +34,10 @@ function collect(roots: string[], mode: 'changed' | 'staged'): Promise<string[]>
                         return false;
                     }
                 });
-        }).catch(() => []);
+        }).catch((): string[] => []);
     })).then((groups) => {
         const seen: Record<string, boolean> = {};
-        return ([] as string[]).concat.apply([], groups).filter((file) => {
+        return groups.flat().filter((file: string) => {
             if (seen[file]) {
                 return false;
             }
@@ -93,4 +93,3 @@ function parseStatus(stdout: string): GitStatusEntry[] {
 module.exports.changedFiles = changedFiles;
 module.exports.stagedFiles = stagedFiles;
 module.exports.parseStatus = parseStatus;
-

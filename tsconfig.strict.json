@@ -1,0 +1,26 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noImplicitAny": true,
+    "noImplicitThis": true
+  },
+  "include": [],
+  "files": [
+    "src/agentInterface.ts",
+    "src/commands.ts",
+    "src/configMigrator.ts",
+    "src/dashboard.ts",
+    "src/debtReport.ts",
+    "src/exportManager.ts",
+    "src/fileWatcher.ts",
+    "src/filterQuery.ts",
+    "src/gitFiles.ts",
+    "src/gitScanner.ts",
+    "src/navigationCommands.ts",
+    "src/scannerClient.ts",
+    "src/scopeManager.ts",
+    "src/statusBar.ts",
+    "src/storagePath.ts",
+    "src/types.ts"
+  ]
+}

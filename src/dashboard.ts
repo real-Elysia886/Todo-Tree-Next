@@ -24,10 +24,16 @@ interface TrendPoint {
     count: number;
 }
 
+interface DashboardPanelLike {
+    webview: {
+        html: string;
+    };
+}
+
 let panel: vscode.WebviewPanel | undefined;
 
 function show(context: vscode.ExtensionContext, provider: CountProvider, actions: DashboardActions): void {
-    collectTrendData(context);
+    collectTrendData(context, provider);
 
     if (panel) {
         panel.reveal();
@@ -167,7 +173,7 @@ function html(context: vscode.ExtensionContext, provider: CountProvider): string
         '</script></body></html>';
 }
 
-function collectTrendData(context: vscode.ExtensionContext): void {
+function collectTrendData(context: vscode.ExtensionContext, provider: CountProvider): void {
     const folders = vscode.workspace.workspaceFolders;
     if (!folders || folders.length === 0) return;
 
@@ -179,10 +185,7 @@ function collectTrendData(context: vscode.ExtensionContext): void {
     child_process.execFile('git', ['-C', root, 'log', '--oneline', '--format=%H %aI', '-n', '10'], { maxBuffer: 1024 * 1024 }, (err, stdout) => {
         if (err) return;
 
-        const commits = stdout.trim().split('\n').filter(Boolean).map(line => {
-            const [hash, date] = line.split(' ');
-            return { hash, date: date ? date.substring(0, 10) : '' };
-        });
+        const commits = parseGitLog(stdout);
 
         // Count TODOs at each commit using git grep
         let completed = 0;
@@ -190,27 +193,45 @@ function collectTrendData(context: vscode.ExtensionContext): void {
 
         commits.forEach(({ hash, date }) => {
             child_process.execFile('git', ['-C', root, 'grep', '-c', '-E', grepPattern, hash, '--'], { maxBuffer: 5 * 1024 * 1024 }, (grepErr, grepOut) => {
-                let count = 0;
-                if (!grepErr && grepOut) {
-                    grepOut.trim().split('\n').forEach(line => {
-                        const parts = line.split(':');
-                        const n = parseInt(parts[parts.length - 1], 10);
-                        if (!isNaN(n)) count += n;
-                    });
-                }
+                const count = !grepErr && grepOut ? countGitGrepOutput(grepOut) : 0;
                 trend.push({ date, count });
                 completed++;
 
                 if (completed === commits.length) {
-                    trend.sort((a, b) => a.date.localeCompare(b.date));
-                    context.workspaceState.update('todoTrend', trend);
-                    if (panel) {
-                        // Refresh panel with new data
-                    }
+                    completeTrendData(context, provider, trend);
                 }
             });
         });
     });
+}
+
+function parseGitLog(stdout: string): Array<{ hash: string; date: string }> {
+    return stdout.trim().split('\n').filter(Boolean).map(line => {
+        const [hash, date] = line.split(' ');
+        return { hash, date: date ? date.substring(0, 10) : '' };
+    });
+}
+
+function countGitGrepOutput(stdout: string): number {
+    return stdout.trim().split('\n').reduce((total, line) => {
+        const parts = line.split(':');
+        const n = parseInt(parts[parts.length - 1], 10);
+        return isNaN(n) ? total : total + n;
+    }, 0);
+}
+
+function completeTrendData(
+    context: vscode.ExtensionContext,
+    provider: CountProvider,
+    trend: TrendPoint[],
+    targetPanel: DashboardPanelLike | undefined = panel,
+    render: (context: vscode.ExtensionContext, provider: CountProvider) => string = html
+): void {
+    const sortedTrend = trend.slice().sort((a, b) => a.date.localeCompare(b.date));
+    context.workspaceState.update('todoTrend', sortedTrend);
+    if (targetPanel) {
+        targetPanel.webview.html = render(context, provider);
+    }
 }
 
 function generateTrendChart(context: vscode.ExtensionContext): string {
@@ -329,4 +350,8 @@ function escapeHtml(text: unknown): string {
 
 module.exports.show = show;
 module.exports.refresh = refresh;
-
+module.exports.__test = {
+    parseGitLog,
+    countGitGrepOutput,
+    completeTrendData
+};
