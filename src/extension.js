@@ -122,6 +122,7 @@ function activate( context )
         if( vscode.workspace.getConfiguration( 'todo-tree.general' ).debug === true )
         {
             outputChannel = vscode.window.createOutputChannel( "Todo Tree" );
+            context.subscriptions.push( outputChannel );
         }
     }
 
@@ -457,7 +458,7 @@ function activate( context )
         statusBarIndicator.command = "todo-tree.stopScan";
         statusBarIndicator.tooltip = "Click to interrupt scan";
 
-        searchList = getRootFolders();
+        searchList = getRootFolders() || [];
 
         if( searchList.length === 0 )
         {
@@ -1302,8 +1303,6 @@ function activate( context )
             documentChanged( e.document );
         } ) );
 
-        context.subscriptions.push( outputChannel );
-
         resetOutputChannel();
 
 
@@ -1347,7 +1346,10 @@ function deactivate()
 {
     ripgrep.kill();
     scannerClient.kill();
-    provider.clear( [] );
+    if( provider )
+    {
+        provider.clear( [] );
+    }
 }
 
 exports.activate = activate;

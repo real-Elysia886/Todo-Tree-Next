@@ -7,6 +7,7 @@ var attributes = require( './attributes.js' ) as any;
 var icons = require( './icons.js' ) as any;
 
 var captureGroupArgument = "capture-groups";
+type TextEditorDecorationType = import('vscode').TextEditorDecorationType;
 
 var lanes: Record<string, number | undefined> =
 {
@@ -17,7 +18,7 @@ var lanes: Record<string, number | undefined> =
     "full": 7
 };
 
-var decorations: Record<string, any> = {};
+var decorations: Record<string, TextEditorDecorationType[]> = {};
 var highlightTimer: Record<string, any> = {};
 var context: any;
 var debug: (text: string) => void;
@@ -26,7 +27,19 @@ function init( context_: any, debug_: (text: string) => void ): void
 {
     context = context_;
     debug = debug_;
-    context.subscriptions.push( decorations );
+    context.subscriptions.push( {
+        dispose()
+        {
+            Object.keys( decorations ).forEach( function( id )
+            {
+                decorations[ id ].forEach( function( decoration )
+                {
+                    decoration.dispose();
+                } );
+                decorations[ id ] = [];
+            } );
+        }
+    } );
 }
 
 function applyOpacity( colour: string, opacity: number ): string
@@ -337,8 +350,8 @@ function highlight( editor )
                     else if( type === 'line' || type === 'whole-line' )
                     {
                         addDecoration(
-                            new vscode.Position( fullEndPos.line, editor.document.lineAt( fullEndPos.line ).range.end.character ),
-                            new vscode.Position( startPos.line, 0 ) );
+                            new vscode.Position( startPos.line, 0 ),
+                            new vscode.Position( fullEndPos.line, editor.document.lineAt( fullEndPos.line ).range.end.character ) );
                     }
                     else
                     {
@@ -381,4 +394,3 @@ function triggerHighlight( editor )
 module.exports.init = init;
 module.exports.getDecoration = getDecoration;
 module.exports.triggerHighlight = triggerHighlight;
-

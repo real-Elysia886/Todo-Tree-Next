@@ -90,6 +90,13 @@ QUnit.test('matches status field for markdown tasks', function(assert) {
     assert.false(matcher({ actualTag: '[ ]', label: 'open task' }));
 });
 
+QUnit.test('status:open only matches open markdown tasks', function(assert) {
+    const matcher = createMatcher('status:open', false);
+    assert.true(matcher({ actualTag: '[ ]', label: 'open task' }));
+    assert.false(matcher({ actualTag: '[x]', label: 'done task' }));
+    assert.false(matcher({ actualTag: 'TODO', label: 'plain todo task' }));
+});
+
 QUnit.test('case insensitive matching by default', function(assert) {
     const matcher = createMatcher('tag:todo', false);
     assert.true(matcher({ actualTag: 'TODO', label: 'test' }));

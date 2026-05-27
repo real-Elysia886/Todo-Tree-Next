@@ -1031,11 +1031,11 @@ class TreeNodeProvider
             {
                 this.reset( uri, child.nodes );
             }
-            if( child.type === TODO && !child.tag && child.fsPath == fullPath ) // no tag (e.g. markdown)
+            if( child.type === TODO && !child.tag && child.fsPath === fullPath ) // no tag (e.g. markdown)
             {
                 keep = false;
             }
-            else if( child.type === TODO && child.parent === undefined && child.fsPath == fullPath ) // top level todo node
+            else if( child.type === TODO && child.parent === undefined && child.fsPath === fullPath ) // top level todo node
             {
                 keep = false;
             }

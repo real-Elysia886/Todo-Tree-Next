@@ -135,10 +135,9 @@ function markdownStatus(node: TodoLike): string {
     if (tag === '[ ]') {
         return 'open';
     }
-    return 'open';
+    return 'unknown';
 }
 
 module.exports.parse = parse;
 module.exports.createMatcher = createMatcher;
 module.exports.matchesNode = matchesNode;
-

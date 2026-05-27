@@ -186,7 +186,7 @@ export function checkForMarkdownUpgrade(ctx: MigrationContext): void {
         } else if (button === YES_BUTTON) {
             addTag('[ ]');
             addTag('[x]');
-            c.update('regex.regex', '(//|#|<!--|;|/\\*|^|^[ \\t]*(-|\\d+.))\\s*($TAGS)', true);
+            c.update('regex.regex', '(//|#|<!--|;|/\\*|^|^[ \\t]*(-|\\d+.))\\s*($TAGS)', vscode.ConfigurationTarget.Global);
         } else if (button === MORE_INFO_BUTTON) {
             vscode.env.openExternal(vscode.Uri.parse("https://github.com/Gruntfuggly/todo-tree#markdown-support"));
         } else if (button === NEVER_SHOW_AGAIN_BUTTON) {
