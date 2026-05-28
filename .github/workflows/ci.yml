@@ -44,6 +44,15 @@ jobs:
       - name: Build Rust scanner
         run: npm run scanner:build
 
+      - name: Install MCP dependencies
+        run: npm ci --prefix mcp
+
+      - name: Build MCP server
+        run: npm run mcp:build
+
+      - name: Test MCP server
+        run: npm run mcp:test
+
       - name: Lint
         run: npm run lint:check
 
@@ -82,6 +91,12 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Install MCP dependencies
+        run: npm ci --prefix mcp
+
+      - name: Check MCP package
+        run: npm run mcp:pack:check
 
       - name: Package extension
         run: npm run package:vsix

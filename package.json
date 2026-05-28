@@ -40,7 +40,8 @@
     "prepare": "husky",
     "mcp:build": "cd mcp && npm run build",
     "mcp:dev": "cd mcp && npm run dev",
-    "mcp:test": "cd mcp && npm test"
+    "mcp:test": "cd mcp && npm test",
+    "mcp:pack:check": "cd mcp && npm pack --dry-run"
   },
   "categories": [
     "Other"

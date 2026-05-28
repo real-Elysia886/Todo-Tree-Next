@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://real-elysia886.github.io/todo-tree-next/schemas/agent-context.schema.json",
+  "title": "Todo Tree Agent Context",
+  "description": "Stable machine-readable TODO context for AI coding agents.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "workspace", "generatedAt", "summary", "items"],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "workspace": {
+      "type": "string",
+      "minLength": 1
+    },
+    "generatedAt": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "summary": {
+      "$ref": "#/$defs/summary"
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/item"
+      }
+    }
+  },
+  "$defs": {
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total", "highPriority", "overdue", "unassigned", "changedInCurrentBranch"],
+      "properties": {
+        "total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "highPriority": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "overdue": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unassigned": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "changedInCurrentBranch": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "file",
+        "relativePath",
+        "line",
+        "column",
+        "tag",
+        "priority",
+        "severity",
+        "text",
+        "context",
+        "contextSnippet",
+        "recommendedOrder",
+        "recommendedAction"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "file": {
+          "type": "string",
+          "minLength": 1
+        },
+        "relativePath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "column": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "tag": {
+          "type": "string",
+          "minLength": 1
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["P0", "P1", "P2", "P3", "none"]
+        },
+        "severity": {
+          "type": "string",
+          "minLength": 1
+        },
+        "assignee": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dueDate": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "labels": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "gitStatus": {
+          "type": "string",
+          "enum": ["untracked", "modified", "staged", "staged+modified", "clean"]
+        },
+        "ageDays": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "text": {
+          "type": "string"
+        },
+        "context": {
+          "type": "string"
+        },
+        "contextSnippet": {
+          "type": "string"
+        },
+        "recommendedOrder": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "recommendedAction": {
+          "type": "string",
+          "enum": [
+            "fix-first",
+            "review-before-merge",
+            "triage-owner",
+            "investigate-risk",
+            "schedule-maintenance"
+          ]
+        }
+      }
+    }
+  }
+}

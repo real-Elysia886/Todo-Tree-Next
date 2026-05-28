@@ -174,6 +174,17 @@ function activate(context) {
                 });
         }
 
+        function showRustScannerError(message) {
+            vscode.window.showErrorMessage(
+                'Todo-Tree: Rust scanner is selected but unavailable: ' + (message || 'unknown error') + '.'
+            );
+            return Promise.resolve();
+        }
+
+        if (options.filename && scannerClient.isRustRequired() && !scannerClient.enabled(context, options)) {
+            return showRustScannerError(scannerClient.unavailableReason(context, options));
+        }
+
         if (options.filename && scannerClient.enabled(context, options)) {
             return scannerClient
                 .scanWorkspace(context, options.filename, options)
@@ -181,6 +192,9 @@ function activate(context) {
                     addMatches(matches, options, 'Rust Workspace');
                 })
                 .catch((e) => {
+                    if (scannerClient.isRustRequired()) {
+                        return showRustScannerError(e.message);
+                    }
                     debug('Rust scanner failed; falling back to ripgrep: ' + e.message);
                     return runRipgrep();
                 });

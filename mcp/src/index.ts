@@ -9,6 +9,7 @@ import * as scanner from './scanner.js';
 import { createMatcher } from './filterQuery.js';
 import { loadAnnotations, addAnnotations, clearAnnotations } from './annotations.js';
 import { generateReport, formatMarkdown, formatJson, getDefaultBaseBranch } from './debtReport.js';
+import { createBranchTodoRisk, getChangedFilesSinceBase } from './branchRisk.js';
 import { FileWatcher } from './watcher.js';
 
 const server = new McpServer({
@@ -202,6 +203,35 @@ server.tool(
         const report = await generateReport(root, baseBranch, tags);
         const content = params.format === 'markdown' ? formatMarkdown(report) : formatJson(report);
         return { content: [{ type: 'text', text: content }] };
+    }
+);
+
+// Tool: get_branch_todo_risk
+server.tool(
+    'get_branch_todo_risk',
+    'Assess TODO risk for the current branch compared to a base branch. Returns added/removed TODO debt, high-risk TODOs, overdue TODOs, TODOs in changed files, and a PR-ready Markdown checklist.',
+    {
+        root: z.string().optional().describe('Workspace root.'),
+        baseBranch: z.string().optional().describe('Base branch to compare against. Auto-detected if omitted.'),
+        tags: z.array(z.string()).optional().describe('Tags to include in branch diff analysis.'),
+        excludeGlobs: z.array(z.string()).optional().describe('Additional scanner exclude globs.'),
+        markdownOnly: z.boolean().optional().describe('Return only the Markdown checklist. Default false.'),
+    },
+    async (params) => {
+        const root = resolveRoot(params.root);
+        const config = getConfig(root);
+        if (params.tags) config.tags = params.tags;
+        if (params.excludeGlobs) config.excludeGlobs = params.excludeGlobs;
+
+        const baseBranch = params.baseBranch || (await getDefaultBaseBranch(root));
+        const [debtReport, agentContext, changedFiles] = await Promise.all([
+            generateReport(root, baseBranch, config.tags),
+            scanner.getAgentContext(root, config),
+            getChangedFilesSinceBase(root, baseBranch),
+        ]);
+        const risk = createBranchTodoRisk(debtReport, agentContext, changedFiles);
+        const text = params.markdownOnly ? risk.markdown : JSON.stringify(risk, null, 2);
+        return { content: [{ type: 'text', text }] };
     }
 );
 

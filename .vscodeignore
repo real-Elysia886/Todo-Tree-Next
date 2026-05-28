@@ -1,5 +1,6 @@
 .vscode
 .github/
+.claude/
 .gitignore
 .gitattributes
 .prettierrc
@@ -11,6 +12,7 @@ test/
 test-files
 coverage/
 debug.log
+*.vsix
 eslint.config.js
 .husky/
 webpack.config.js
@@ -20,5 +22,7 @@ buildCodiconNames.js
 copyScanner.js
 dist/extension.js.map
 scanner/**
+mcp/**
+todo-tree-master/**
 node_modules/.cache/**
 bench/**

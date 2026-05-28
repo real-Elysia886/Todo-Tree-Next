@@ -63,6 +63,10 @@ This lets external tools, scripts, CI jobs, and future MCP servers consume the s
 
 ## Agent Context Schema
 
+The canonical machine-readable schema is versioned at
+[`docs/schemas/agent-context.schema.json`](schemas/agent-context.schema.json). Contract tests run the Rust scanner
+against this schema so VS Code commands, MCP tools, and CLI output keep the same camelCase protocol.
+
 ```json
 {
   "schemaVersion": 1,
@@ -149,4 +153,3 @@ Relative paths are resolved against the first workspace folder. Absolute paths a
 - Task decomposition: turn TODOs into ordered implementation tasks.
 - Auto-fix suggestions: annotate TODOs where a safe local fix appears possible.
 - PR risk warnings: surface newly added or modified high-priority TODOs.
-

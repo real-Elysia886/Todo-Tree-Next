@@ -50,21 +50,29 @@ function scannerMode(): string {
     return require('vscode').workspace.getConfiguration('todo-tree.scanner').get('engine', 'auto');
 }
 
+function isRustRequired(): boolean {
+    return scannerMode() === 'rust';
+}
+
+function unavailableReason(context: ExtensionContextLike, options: ScannerOptions): string | undefined {
+    if (options.multiline === true) {
+        return 'the Rust scanner does not support multiline regular expressions';
+    }
+
+    if (scannerPath(context) === undefined) {
+        return 'todo-scanner executable not found';
+    }
+
+    return undefined;
+}
+
 function enabled(context: ExtensionContextLike, options: ScannerOptions): boolean {
     const mode = scannerMode();
     if (mode === 'ripgrep') {
         return false;
     }
 
-    if (options.multiline === true) {
-        return false;
-    }
-
-    if (scannerPath(context) === undefined) {
-        return false;
-    }
-
-    return true;
+    return unavailableReason(context, options) === undefined;
 }
 
 function splitGlobs(globs?: string[]): { includeGlobs: string[]; excludeGlobs: string[] } {
@@ -213,6 +221,8 @@ function kill(): void {
 }
 
 module.exports.enabled = enabled;
+module.exports.isRustRequired = isRustRequired;
+module.exports.unavailableReason = unavailableReason;
 module.exports.scanWorkspace = scanWorkspace;
 module.exports.scanFile = scanFile;
 module.exports.getAgentContext = getAgentContext;

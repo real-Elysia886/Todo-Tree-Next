@@ -157,7 +157,7 @@ Full schema: [docs/AGENT_INTERFACE.md](docs/AGENT_INTERFACE.md)
 
 ## MCP Server
 
-An MCP (Model Context Protocol) server is included in `mcp/`, allowing AI CLI tools like Claude Code, Codex CLI, and other MCP-compatible clients to interact with the TODO scanner directly — no VS Code required.
+The MCP (Model Context Protocol) server is published independently from the VS Code extension as `@real-elysia886/todo-tree-mcp`. This keeps the VSIX small and lets CLI tools use TODO intelligence without depending on a VS Code installation.
 
 ### Setup
 
@@ -166,10 +166,10 @@ An MCP (Model Context Protocol) server is included in `mcp/`, allowing AI CLI to
 {
   "mcpServers": {
     "todo-tree": {
-      "command": "node",
-      "args": ["path/to/todo-tree-next/mcp/dist/index.js"],
+      "command": "npx",
+      "args": ["@real-elysia886/todo-tree-mcp", "path/to/workspace"],
       "env": {
-        "TODO_TREE_SCANNER_PATH": "path/to/todo-scanner.exe"
+        "TODO_TREE_SCANNER_PATH": "path/to/todo-scanner"
       }
     }
   }
@@ -179,8 +179,7 @@ An MCP (Model Context Protocol) server is included in `mcp/`, allowing AI CLI to
 Or run directly:
 
 ```bash
-cd mcp && npm install && npm run build
-node dist/index.js
+TODO_TREE_SCANNER_PATH=path/to/todo-scanner npx @real-elysia886/todo-tree-mcp path/to/workspace
 ```
 
 ### Available Tools
@@ -194,6 +193,7 @@ node dist/index.js
 | `annotate_finding` | Write annotations to `.todo-tree/annotations.json` |
 | `clear_annotations` | Clear annotations, optionally by source |
 | `get_debt_report` | TODO debt report (current branch vs base) |
+| `get_branch_todo_risk` | PR-ready TODO risk summary with added debt, overdue items, and changed-file TODOs |
 
 ### MCP Resources
 

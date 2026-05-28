@@ -1,6 +1,6 @@
 import * as child_process from 'child_process';
 
-interface DebtItem {
+export interface DebtItem {
     file: string;
     line: number;
     tag: string;
@@ -8,7 +8,7 @@ interface DebtItem {
     status: 'added' | 'removed';
 }
 
-interface DebtReport {
+export interface DebtReport {
     baseBranch: string;
     currentBranch: string;
     generatedAt: string;
