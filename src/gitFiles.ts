@@ -17,25 +17,29 @@ function stagedFiles(roots: string[]): Promise<string[]> {
 }
 
 function collect(roots: string[], mode: 'changed' | 'staged'): Promise<string[]> {
-    return Promise.all(roots.map((root) => {
-        return status(root).then((entries) => {
-            return entries
-                .filter((entry) => {
-                    if (mode === 'staged') {
-                        return entry.indexStatus && entry.indexStatus !== ' ' && entry.indexStatus !== '?';
-                    }
-                    return entry.indexStatus !== ' ' || entry.worktreeStatus !== ' ';
+    return Promise.all(
+        roots.map((root) => {
+            return status(root)
+                .then((entries) => {
+                    return entries
+                        .filter((entry) => {
+                            if (mode === 'staged') {
+                                return entry.indexStatus && entry.indexStatus !== ' ' && entry.indexStatus !== '?';
+                            }
+                            return entry.indexStatus !== ' ' || entry.worktreeStatus !== ' ';
+                        })
+                        .map((entry) => path.resolve(root, entry.file))
+                        .filter((file) => {
+                            try {
+                                return fs.existsSync(file) && fs.statSync(file).isFile();
+                            } catch (e) {
+                                return false;
+                            }
+                        });
                 })
-                .map((entry) => path.resolve(root, entry.file))
-                .filter((file) => {
-                    try {
-                        return fs.existsSync(file) && fs.statSync(file).isFile();
-                    } catch (e) {
-                        return false;
-                    }
-                });
-        }).catch((): string[] => []);
-    })).then((groups) => {
+                .catch((): string[] => []);
+        })
+    ).then((groups) => {
         const seen: Record<string, boolean> = {};
         return groups.flat().filter((file: string) => {
             if (seen[file]) {
@@ -49,13 +53,18 @@ function collect(roots: string[], mode: 'changed' | 'staged'): Promise<string[]>
 
 function status(root: string): Promise<GitStatusEntry[]> {
     return new Promise((resolve, reject) => {
-        child_process.execFile('git', ['-C', root, 'status', '--porcelain', '-z'], { maxBuffer: 10 * 1024 * 1024 }, (error, stdout) => {
-            if (error) {
-                reject(error);
-                return;
+        child_process.execFile(
+            'git',
+            ['-C', root, 'status', '--porcelain', '-z'],
+            { maxBuffer: 10 * 1024 * 1024 },
+            (error, stdout) => {
+                if (error) {
+                    reject(error);
+                    return;
+                }
+                resolve(parseStatus(stdout));
             }
-            resolve(parseStatus(stdout));
-        });
+        );
     });
 }
 
@@ -83,7 +92,7 @@ function parseStatus(stdout: string): GitStatusEntry[] {
         entries.push({
             indexStatus,
             worktreeStatus,
-            file
+            file,
         });
     }
 

@@ -1,84 +1,77 @@
-var path = require( 'path' );
+const path = require('path');
 
-var searchResults = [];
+const resultsByUri = new Map();
 
-function clear()
-{
-    searchResults = [];
+function uriKey(uri) {
+    if (uri && uri.toString) return uri.toString();
+    return uri;
 }
 
-function add( result )
-{
-    searchResults.push( result );
+function clear() {
+    resultsByUri.clear();
 }
 
-function remove( uri )
-{
-    var uriText = uri && uri.toString ? uri.toString() : uri;
-    var fsPath = uri && uri.fsPath ? uri.fsPath : undefined;
+function add(result) {
+    const key = uriKey(result.uri);
+    let arr = resultsByUri.get(key);
+    if (!arr) {
+        arr = [];
+        resultsByUri.set(key, arr);
+    }
+    arr.push(result);
+}
 
-    searchResults = searchResults.filter( function( match )
-    {
-        if( match.uri === uri )
-        {
-            return false;
+function remove(uri) {
+    resultsByUri.delete(uriKey(uri));
+}
+
+function addToTree(tree) {
+    for (const arr of resultsByUri.values()) {
+        for (const match of arr) {
+            if (match.added !== true) {
+                tree.add(match);
+                match.added = true;
+            }
         }
-        if( uriText && match.uri && match.uri.toString && match.uri.toString() === uriText )
-        {
-            return false;
+    }
+}
+
+function containsMarkdown() {
+    for (const arr of resultsByUri.values()) {
+        for (const match of arr) {
+            if (path.extname(match.uri.fsPath) === '.md') return true;
         }
-        if( fsPath && match.uri && match.uri.fsPath === fsPath )
-        {
-            return false;
-        }
-        return true;
-    } );
+    }
+    return false;
 }
 
-function addToTree( tree )
-{
-    searchResults.map( function( match )
-    {
-        if( match.added !== true )
-        {
-            tree.add( match );
-            match.added = true;
-        }
-    } );
+function count() {
+    let total = 0;
+    for (const arr of resultsByUri.values()) total += arr.length;
+    return total;
 }
 
-function containsMarkdown()
-{
-    return searchResults.filter( function( match )
-    {
-        return path.extname( match.uri.fsPath ) === '.md';
-    } ).length > 0;
+function contains(result) {
+    const key = uriKey(result.uri);
+    const arr = resultsByUri.get(key);
+    if (!arr) return false;
+    return arr.some(
+        (match) => match.uri === result.uri && match.line === result.line && match.column === result.column
+    );
 }
 
-function count()
-{
-    return searchResults.length;
+function markAsNotAdded() {
+    for (const arr of resultsByUri.values()) {
+        for (const match of arr) match.added = false;
+    }
 }
 
-function contains( result )
-{
-    return searchResults.filter( function( match )
-    {
-        return match.uri === result.uri && match.line == result.line && match.column == result.column;
-    } ).length > 0;
-}
-
-function markAsNotAdded()
-{
-    searchResults.forEach( function( match )
-    {
-        match.added = false;
-    } );
-}
-
-function filter( filterFunction )
-{
-    searchResults = searchResults.filter( filterFunction );
+function filter(filterFunction) {
+    for (const [key, arr] of resultsByUri) {
+        const filtered = arr.filter(filterFunction);
+        if (filtered.length === 0) resultsByUri.delete(key);
+        else resultsByUri.set(key, filtered);
+    }
 }
 
 module.exports.clear = clear;

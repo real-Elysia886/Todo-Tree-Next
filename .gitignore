@@ -1,6 +1,8 @@
 test-files
 node_modules
 dist
+coverage
+debug.log
 
 # https://github.com/github/gitignore/blob/master/Global/VisualStudioCode.gitignore
 .vscode/*

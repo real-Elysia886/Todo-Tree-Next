@@ -17,7 +17,7 @@ interface TodoLike {
 function parse(text?: string): Query {
     const query: Query = {
         terms: [],
-        fields: {}
+        fields: {},
     };
 
     tokenize(text || '').forEach((token) => {
@@ -86,20 +86,28 @@ function matchesNode(node: TodoLike, query: Query, caseSensitive: boolean): bool
         node.actualTag,
         node.tag,
         node.subTag,
-        node.priority
-    ].filter(Boolean).join(' ');
+        node.priority,
+    ]
+        .filter(Boolean)
+        .join(' ');
 
     const fields = query.fields;
-    return query.terms.every((term) => contains(haystack, term, caseSensitive)) &&
+    return (
+        query.terms.every((term) => contains(haystack, term, caseSensitive)) &&
         matchField(fields.tag, node.actualTag || node.tag, caseSensitive) &&
         matchField(fields.path, node.fsPath, caseSensitive) &&
         matchField(fields.file, basename(node.fsPath), caseSensitive) &&
         matchField(fields.text, [node.label, node.after, node.before].filter(Boolean).join(' '), caseSensitive) &&
         matchField(fields.priority, node.priority || 'none', caseSensitive) &&
-        matchField(fields.status, markdownStatus(node), caseSensitive);
+        matchField(fields.status, markdownStatus(node), caseSensitive)
+    );
 }
 
-function matchField(expectedValues: string[] | undefined, actualValue: string | undefined, caseSensitive: boolean): boolean {
+function matchField(
+    expectedValues: string[] | undefined,
+    actualValue: string | undefined,
+    caseSensitive: boolean
+): boolean {
     if (expectedValues === undefined || expectedValues.length === 0) {
         return true;
     }

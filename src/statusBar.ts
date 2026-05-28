@@ -46,56 +46,62 @@ export function updateInformation(
 
     let title: string;
     if (config.shouldFlatten()) {
-        title = "Flat";
+        title = 'Flat';
     } else if (config.shouldShowTagsOnly()) {
-        title = "Tags";
+        title = 'Tags';
     } else {
-        title = "Tree";
+        title = 'Tree';
     }
 
     if (total > 0 && vscode.workspace.getConfiguration('todo-tree.tree').get('showCountsInTree') === true) {
-        title += " (" + total + ")";
+        title += ' (' + total + ')';
     }
     todoTreeView.title = title;
 
     if (statusBar === STATUS_BAR_TOTAL) {
-        statusBarIndicator.text = "$(check) " + total;
-        statusBarIndicator.tooltip = "Todo-Tree total";
+        statusBarIndicator.text = '$(check) ' + total;
+        statusBarIndicator.tooltip = 'Todo-Tree total';
         statusBarIndicator.show();
-    } else if (statusBar === STATUS_BAR_TAGS || statusBar === STATUS_BAR_CURRENT_FILE || statusBar === STATUS_BAR_TOP_THREE) {
+    } else if (
+        statusBar === STATUS_BAR_TAGS ||
+        statusBar === STATUS_BAR_CURRENT_FILE ||
+        statusBar === STATUS_BAR_TOP_THREE
+    ) {
         let sortedTags = Object.keys(counts);
         if (statusBar === STATUS_BAR_TOP_THREE) {
-            sortedTags.sort((a, b) => counts[a] < counts[b] ? 1 : counts[b] < counts[a] ? -1 : a > b ? 1 : -1);
+            sortedTags.sort((a, b) => (counts[a] < counts[b] ? 1 : counts[b] < counts[a] ? -1 : a > b ? 1 : -1));
             sortedTags = sortedTags.splice(0, 3);
         } else {
             sortedTags = config.tags();
         }
 
-        let text = "";
+        let text = '';
         const showIcons = config.shouldShowIconsInsteadOfTagsInStatusBar();
         sortedTags.forEach((tag: string) => {
             if (counts[tag] > 0) {
-                if (text.length > 0) { text += " "; }
+                if (text.length > 0) {
+                    text += ' ';
+                }
                 const icon = attributes.getIcon(tag);
                 if (icon !== config.defaultHighlight().icon && showIcons) {
-                    const iconStr = !utils.isCodicon(icon) ? "$(" + icon + ")" : icon;
-                    text += iconStr + " " + counts[tag] + "  ";
+                    const iconStr = !utils.isCodicon(icon) ? '$(' + icon + ')' : icon;
+                    text += iconStr + ' ' + counts[tag] + '  ';
                 } else {
-                    text += tag + ": " + counts[tag] + " ";
+                    text += tag + ': ' + counts[tag] + ' ';
                 }
             }
         });
 
-        statusBarIndicator.text = showIcons ? text.trim() : "$(check) " + text.trim();
+        statusBarIndicator.text = showIcons ? text.trim() : '$(check) ' + text.trim();
         if (statusBar === STATUS_BAR_CURRENT_FILE) {
-            statusBarIndicator.tooltip = "Todo-Tree tags counts in current file";
+            statusBarIndicator.tooltip = 'Todo-Tree tags counts in current file';
         } else if (statusBar === STATUS_BAR_TOP_THREE) {
-            statusBarIndicator.tooltip = "Todo-Tree top three tag counts";
+            statusBarIndicator.tooltip = 'Todo-Tree top three tag counts';
         } else {
-            statusBarIndicator.tooltip = "Todo-Tree tags counts";
+            statusBarIndicator.tooltip = 'Todo-Tree tags counts';
         }
         if (Object.keys(counts).length === 0) {
-            statusBarIndicator.text = "$(check) 0";
+            statusBarIndicator.text = '$(check) 0';
         }
         statusBarIndicator.show();
     } else {
@@ -104,12 +110,12 @@ export function updateInformation(
 
     const scanMode = config.scanMode();
     if (scanMode === SCAN_MODE_OPEN_FILES) {
-        statusBarIndicator.text += " (in open files)";
+        statusBarIndicator.text += ' (in open files)';
     } else if (scanMode === SCAN_MODE_CURRENT_FILE) {
-        statusBarIndicator.text += " (in current file)";
+        statusBarIndicator.text += ' (in current file)';
     }
 
-    statusBarIndicator.command = "todo-tree.onStatusBarClicked";
+    statusBarIndicator.command = 'todo-tree.onStatusBarClicked';
 }
 
 export function onStatusBarClicked(
@@ -128,16 +134,16 @@ export function onStatusBarClicked(
         let setting = vscode.workspace.getConfiguration('todo-tree.general').get<string>('statusBar');
         if (setting === STATUS_BAR_TOTAL) {
             setting = STATUS_BAR_TAGS;
-            vscode.window.showInformationMessage("Todo Tree: Now showing tag counts");
+            vscode.window.showInformationMessage('Todo Tree: Now showing tag counts');
         } else if (setting === STATUS_BAR_TAGS) {
             setting = STATUS_BAR_TOP_THREE;
-            vscode.window.showInformationMessage("Todo Tree: Now showing top three tag counts");
+            vscode.window.showInformationMessage('Todo Tree: Now showing top three tag counts');
         } else if (setting === STATUS_BAR_TOP_THREE) {
             setting = STATUS_BAR_CURRENT_FILE;
-            vscode.window.showInformationMessage("Todo Tree: Now showing total tags in current file");
+            vscode.window.showInformationMessage('Todo Tree: Now showing total tags in current file');
         } else {
             setting = STATUS_BAR_TOTAL;
-            vscode.window.showInformationMessage("Todo Tree: Now showing total tags");
+            vscode.window.showInformationMessage('Todo Tree: Now showing total tags');
         }
         vscode.workspace.getConfiguration('todo-tree.general').update('statusBar', setting, true);
     }

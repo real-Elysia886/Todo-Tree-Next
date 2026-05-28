@@ -22,7 +22,10 @@ interface DebtReport {
 function execGit(args: string[], cwd: string): Promise<string> {
     return new Promise((resolve, reject) => {
         child_process.execFile('git', args, { cwd, maxBuffer: 10 * 1024 * 1024 }, (err, stdout) => {
-            if (err) { reject(err); return; }
+            if (err) {
+                reject(err);
+                return;
+            }
             resolve(stdout);
         });
     });
@@ -38,14 +41,18 @@ async function getDefaultBaseBranch(root: string): Promise<string> {
         try {
             await execGit(['rev-parse', '--verify', candidate], root);
             return candidate;
-        } catch { /* not found */ }
+        } catch {
+            /* not found */
+        }
     }
     return 'main';
 }
 
 export function parseDiffForTodos(diff: string, tags: string[]): DebtItem[] {
     const items: DebtItem[] = [];
-    const tagPattern = new RegExp('\\b(' + tags.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')\\b');
+    const tagPattern = new RegExp(
+        '\\b(' + tags.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')\\b'
+    );
     let currentFile = '';
     let lineNumber = 0;
 
@@ -70,7 +77,13 @@ export function parseDiffForTodos(diff: string, tags: string[]): DebtItem[] {
             const content = rawLine.substring(1);
             const match = content.match(tagPattern);
             if (match) {
-                items.push({ file: currentFile, line: lineNumber, tag: match[1], text: content.trim(), status: 'added' });
+                items.push({
+                    file: currentFile,
+                    line: lineNumber,
+                    tag: match[1],
+                    text: content.trim(),
+                    status: 'added',
+                });
             }
         } else if (rawLine.startsWith('-') && !rawLine.startsWith('---')) {
             const content = rawLine.substring(1);
@@ -89,8 +102,8 @@ async function generateReport(root: string, baseBranch: string, tags: string[]):
     const diff = await execGit(['diff', mergeBase, 'HEAD', '-U0'], root);
     const items = parseDiffForTodos(diff, tags);
 
-    const added = items.filter(i => i.status === 'added');
-    const removed = items.filter(i => i.status === 'removed');
+    const added = items.filter((i) => i.status === 'added');
+    const removed = items.filter((i) => i.status === 'removed');
 
     return {
         baseBranch,
@@ -98,7 +111,7 @@ async function generateReport(root: string, baseBranch: string, tags: string[]):
         generatedAt: new Date().toISOString(),
         added,
         removed,
-        summary: { added: added.length, removed: removed.length, net: added.length - removed.length }
+        summary: { added: added.length, removed: removed.length, net: added.length - removed.length },
     };
 }
 
@@ -116,12 +129,12 @@ function formatMarkdown(report: DebtReport): string {
         `| Added | ${report.summary.added} |`,
         `| Removed | ${report.summary.removed} |`,
         `| Net change | ${report.summary.net > 0 ? '+' : ''}${report.summary.net} |`,
-        ''
+        '',
     ];
 
     if (report.added.length > 0) {
         lines.push('## Added TODOs', '');
-        report.added.forEach(item => {
+        report.added.forEach((item) => {
             lines.push(`- **${item.tag}** \`${item.file}:${item.line}\` ${item.text}`);
         });
         lines.push('');
@@ -129,7 +142,7 @@ function formatMarkdown(report: DebtReport): string {
 
     if (report.removed.length > 0) {
         lines.push('## Removed TODOs', '');
-        report.removed.forEach(item => {
+        report.removed.forEach((item) => {
             lines.push(`- ~~**${item.tag}** \`${item.file}\` ${item.text}~~`);
         });
         lines.push('');
@@ -143,48 +156,59 @@ function formatJson(report: DebtReport): string {
 }
 
 export function registerCommand(context: vscode.ExtensionContext): void {
-    context.subscriptions.push(vscode.commands.registerCommand('todo-tree.exportDebtReport', async () => {
-        const folders = vscode.workspace.workspaceFolders;
-        if (!folders || folders.length === 0) {
-            vscode.window.showWarningMessage('Todo Tree: No workspace folder open.');
-            return;
-        }
+    context.subscriptions.push(
+        vscode.commands.registerCommand('todo-tree.exportDebtReport', async () => {
+            const folders = vscode.workspace.workspaceFolders;
+            if (!folders || folders.length === 0) {
+                vscode.window.showWarningMessage('Todo Tree: No workspace folder open.');
+                return;
+            }
 
-        const root = folders[0].uri.fsPath;
-        const tags = vscode.workspace.getConfiguration('todo-tree.general').get<string[]>('tags') || ['TODO', 'FIXME', 'BUG'];
+            const root = folders[0].uri.fsPath;
+            const tags = vscode.workspace.getConfiguration('todo-tree.general').get<string[]>('tags') || [
+                'TODO',
+                'FIXME',
+                'BUG',
+            ];
 
-        let baseBranch: string;
-        try {
-            baseBranch = await getDefaultBaseBranch(root);
-        } catch {
-            vscode.window.showErrorMessage('Todo Tree: Not a Git repository.');
-            return;
-        }
+            let baseBranch: string;
+            try {
+                baseBranch = await getDefaultBaseBranch(root);
+            } catch {
+                vscode.window.showErrorMessage('Todo Tree: Not a Git repository.');
+                return;
+            }
 
-        const input = await vscode.window.showInputBox({
-            prompt: 'Base branch to compare against',
-            value: baseBranch
-        });
-        if (!input) return;
+            const input = await vscode.window.showInputBox({
+                prompt: 'Base branch to compare against',
+                value: baseBranch,
+            });
+            if (!input) return;
 
-        try {
-            const report = await generateReport(root, input, tags);
-            const format = await vscode.window.showQuickPick(['Markdown', 'JSON'], { placeHolder: 'Export format' });
-            if (!format) return;
+            try {
+                const report = await generateReport(root, input, tags);
+                const format = await vscode.window.showQuickPick(['Markdown', 'JSON'], {
+                    placeHolder: 'Export format',
+                });
+                if (!format) return;
 
-            const content = format === 'JSON' ? formatJson(report) : formatMarkdown(report);
-            const ext = format === 'JSON' ? '.json' : '.md';
+                const content = format === 'JSON' ? formatJson(report) : formatMarkdown(report);
+                const ext = format === 'JSON' ? '.json' : '.md';
 
-            const doc = await vscode.workspace.openTextDocument({ content, language: format === 'JSON' ? 'json' : 'markdown' });
-            await vscode.window.showTextDocument(doc, { preview: true });
+                const doc = await vscode.workspace.openTextDocument({
+                    content,
+                    language: format === 'JSON' ? 'json' : 'markdown',
+                });
+                await vscode.window.showTextDocument(doc, { preview: true });
 
-            const net = report.summary.net;
-            vscode.window.showInformationMessage(
-                `TODO Debt: +${report.summary.added} / -${report.summary.removed} (net ${net > 0 ? '+' : ''}${net})`
-            );
-        } catch (e: unknown) {
-            const msg = e instanceof Error ? e.message : String(e);
-            vscode.window.showErrorMessage('Todo Tree: Debt report failed: ' + msg);
-        }
-    }));
+                const net = report.summary.net;
+                vscode.window.showInformationMessage(
+                    `TODO Debt: +${report.summary.added} / -${report.summary.removed} (net ${net > 0 ? '+' : ''}${net})`
+                );
+            } catch (e: unknown) {
+                const msg = e instanceof Error ? e.message : String(e);
+                vscode.window.showErrorMessage('Todo Tree: Debt report failed: ' + msg);
+            }
+        })
+    );
 }

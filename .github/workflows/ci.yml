@@ -44,14 +44,20 @@ jobs:
       - name: Build Rust scanner
         run: npm run scanner:build
 
+      - name: Lint
+        run: npm run lint:check
+
+      - name: Check formatting
+        run: npm run format:check
+
       - name: Type check
         run: npm run typecheck
 
       - name: Strict type check
         run: npm run typecheck:strict
 
-      - name: Test extension
-        run: npm test
+      - name: Test extension with coverage
+        run: npm run test:coverage
 
       - name: Bundle extension
         run: npm run webpack

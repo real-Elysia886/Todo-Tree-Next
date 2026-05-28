@@ -41,15 +41,10 @@ function show(context: vscode.ExtensionContext, provider: CountProvider, actions
         return;
     }
 
-    panel = vscode.window.createWebviewPanel(
-        'todoTreeDashboard',
-        'Todo Tree Dashboard',
-        vscode.ViewColumn.One,
-        {
-            enableScripts: true,
-            retainContextWhenHidden: true
-        }
-    );
+    panel = vscode.window.createWebviewPanel('todoTreeDashboard', 'Todo Tree Dashboard', vscode.ViewColumn.One, {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+    });
 
     panel.webview.html = html(context, provider);
 
@@ -76,13 +71,19 @@ function handleMessage(message: DashboardMessage, context: vscode.ExtensionConte
     } else if (command === 'clearFilter') {
         actions.clearTreeFilter();
     } else if (command === 'scanMode') {
-        vscode.workspace.getConfiguration('todo-tree.tree').update('scanMode', message.value, vscode.ConfigurationTarget.Workspace);
+        vscode.workspace
+            .getConfiguration('todo-tree.tree')
+            .update('scanMode', message.value, vscode.ConfigurationTarget.Workspace);
     } else if (command === 'scannerEngine') {
-        vscode.workspace.getConfiguration('todo-tree.scanner').update('engine', message.value, vscode.ConfigurationTarget.Workspace);
+        vscode.workspace
+            .getConfiguration('todo-tree.scanner')
+            .update('engine', message.value, vscode.ConfigurationTarget.Workspace);
     } else if (command === 'maxFileSize') {
         const value = parseInt(message.value || '', 10);
         if (!isNaN(value) && value > 0) {
-            vscode.workspace.getConfiguration('todo-tree.scanner').update('maxFileSize', value, vscode.ConfigurationTarget.Workspace);
+            vscode.workspace
+                .getConfiguration('todo-tree.scanner')
+                .update('maxFileSize', value, vscode.ConfigurationTarget.Workspace);
         }
     } else if (command === 'filter') {
         actions.applyFilter(message.value || '');
@@ -105,14 +106,18 @@ function html(context: vscode.ExtensionContext, provider: CountProvider): string
     const filtering = vscode.workspace.getConfiguration('todo-tree.filtering');
     const counts = provider.getTagCountsForActivityBar();
     const total = Object.values(counts).reduce((a, b) => a + b, 0);
-    const rows = Object.keys(counts).sort().map((tag) => {
-        return '<tr><td>' + escapeHtml(tag) + '</td><td>' + counts[tag] + '</td></tr>';
-    }).join('');
+    const rows = Object.keys(counts)
+        .sort()
+        .map((tag) => {
+            return '<tr><td>' + escapeHtml(tag) + '</td><td>' + counts[tag] + '</td></tr>';
+        })
+        .join('');
 
     const pieChart = generatePieChart(counts);
     const barChart = generateBarChart(counts);
 
-    return '<!DOCTYPE html>' +
+    return (
+        '<!DOCTYPE html>' +
         '<html><head><meta charset="UTF-8">' +
         '<meta name="viewport" content="width=device-width, initial-scale=1.0">' +
         '<style>' +
@@ -144,15 +149,28 @@ function html(context: vscode.ExtensionContext, provider: CountProvider): string
         metric('Max file size', scanner.get('maxFileSize', 1048576) + ' bytes') +
         '</section>' +
         '<section><h2>Charts</h2><div class="chart-grid">' +
-        '<div class="chart-container"><h3>Tag Distribution</h3>' + pieChart + '</div>' +
-        '<div class="chart-container"><h3>Tag Counts</h3>' + barChart + '</div>' +
+        '<div class="chart-container"><h3>Tag Distribution</h3>' +
+        pieChart +
         '</div>' +
-        '<div class="chart-container" style="margin-top:16px;"><h3>TODO Trend (recent commits)</h3>' + generateTrendChart(context) + '</div>' +
+        '<div class="chart-container"><h3>Tag Counts</h3>' +
+        barChart +
+        '</div>' +
+        '</div>' +
+        '<div class="chart-container" style="margin-top:16px;"><h3>TODO Trend (recent commits)</h3>' +
+        generateTrendChart(context) +
+        '</div>' +
         '</section>' +
         '<section><div class="grid">' +
         selectControl('Scanner engine', 'scannerEngine', scanner.get('engine', 'auto'), ['auto', 'rust', 'ripgrep']) +
-        selectControl('Scan mode', 'scanMode', tree.get('scanMode', 'workspace'), ['workspace', 'workspace only', 'open files', 'current file']) +
-        '<div><label>Max file size</label><input id="maxFileSize" type="number" value="' + scanner.get('maxFileSize', 1048576) + '"></div>' +
+        selectControl('Scan mode', 'scanMode', tree.get('scanMode', 'workspace'), [
+            'workspace',
+            'workspace only',
+            'open files',
+            'current file',
+        ]) +
+        '<div><label>Max file size</label><input id="maxFileSize" type="number" value="' +
+        scanner.get('maxFileSize', 1048576) +
+        '"></div>' +
         '<div><label>Smart filter</label><input id="filter" placeholder="tag:TODO path:src priority:P0"></div>' +
         '</div></section>' +
         '<section>' +
@@ -162,15 +180,22 @@ function html(context: vscode.ExtensionContext, provider: CountProvider): string
         '<button class="secondary" onclick="post({command:\'clearFilter\'})">Clear Filter</button>' +
         '<button class="secondary" onclick="post({command:\'maxFileSize\',value:document.getElementById(\'maxFileSize\').value})">Save Size</button>' +
         '<button class="secondary" onclick="post({command:\'filter\',value:document.getElementById(\'filter\').value})">Apply Filter</button>' +
-        '<p class="muted">Include globs: ' + escapeHtml(JSON.stringify(filtering.get('includeGlobs', []))) + '</p>' +
-        '<p class="muted">Exclude globs: ' + escapeHtml(JSON.stringify(filtering.get('excludeGlobs', []))) + '</p>' +
+        '<p class="muted">Include globs: ' +
+        escapeHtml(JSON.stringify(filtering.get('includeGlobs', []))) +
+        '</p>' +
+        '<p class="muted">Exclude globs: ' +
+        escapeHtml(JSON.stringify(filtering.get('excludeGlobs', []))) +
+        '</p>' +
         '</section>' +
-        '<section><h2>Tag Counts</h2><table><thead><tr><th>Tag</th><th>Count</th></tr></thead><tbody>' + rows + '</tbody></table></section>' +
+        '<section><h2>Tag Counts</h2><table><thead><tr><th>Tag</th><th>Count</th></tr></thead><tbody>' +
+        rows +
+        '</tbody></table></section>' +
         '</main><script>' +
         'const vscode=acquireVsCodeApi();' +
         'function post(message){vscode.postMessage(message);}' +
         'document.querySelectorAll("select[data-command]").forEach(function(el){el.addEventListener("change",function(){post({command:el.dataset.command,value:el.value});});});' +
-        '</script></body></html>';
+        '</script></body></html>'
+    );
 }
 
 function collectTrendData(context: vscode.ExtensionContext, provider: CountProvider): void {
@@ -178,46 +203,67 @@ function collectTrendData(context: vscode.ExtensionContext, provider: CountProvi
     if (!folders || folders.length === 0) return;
 
     const root = folders[0].uri.fsPath;
-    const tags = vscode.workspace.getConfiguration('todo-tree.general').get<string[]>('tags') || ['TODO', 'FIXME', 'BUG'];
+    const tags = vscode.workspace.getConfiguration('todo-tree.general').get<string[]>('tags') || [
+        'TODO',
+        'FIXME',
+        'BUG',
+    ];
     const grepPattern = tags.join('|');
 
     // Get last 10 commits with dates
-    child_process.execFile('git', ['-C', root, 'log', '--oneline', '--format=%H %aI', '-n', '10'], { maxBuffer: 1024 * 1024 }, (err, stdout) => {
-        if (err) return;
+    child_process.execFile(
+        'git',
+        ['-C', root, 'log', '--oneline', '--format=%H %aI', '-n', '10'],
+        { maxBuffer: 1024 * 1024 },
+        (err, stdout) => {
+            if (err) return;
 
-        const commits = parseGitLog(stdout);
+            const commits = parseGitLog(stdout);
 
-        // Count TODOs at each commit using git grep
-        let completed = 0;
-        const trend: TrendPoint[] = [];
+            // Count TODOs at each commit using git grep
+            let completed = 0;
+            const trend: TrendPoint[] = [];
 
-        commits.forEach(({ hash, date }) => {
-            child_process.execFile('git', ['-C', root, 'grep', '-c', '-E', grepPattern, hash, '--'], { maxBuffer: 5 * 1024 * 1024 }, (grepErr, grepOut) => {
-                const count = !grepErr && grepOut ? countGitGrepOutput(grepOut) : 0;
-                trend.push({ date, count });
-                completed++;
+            commits.forEach(({ hash, date }) => {
+                child_process.execFile(
+                    'git',
+                    ['-C', root, 'grep', '-c', '-E', grepPattern, hash, '--'],
+                    { maxBuffer: 5 * 1024 * 1024 },
+                    (grepErr, grepOut) => {
+                        const count = !grepErr && grepOut ? countGitGrepOutput(grepOut) : 0;
+                        trend.push({ date, count });
+                        completed++;
 
-                if (completed === commits.length) {
-                    completeTrendData(context, provider, trend);
-                }
+                        if (completed === commits.length) {
+                            completeTrendData(context, provider, trend);
+                        }
+                    }
+                );
             });
-        });
-    });
+        }
+    );
 }
 
 function parseGitLog(stdout: string): Array<{ hash: string; date: string }> {
-    return stdout.trim().split('\n').filter(Boolean).map(line => {
-        const [hash, date] = line.split(' ');
-        return { hash, date: date ? date.substring(0, 10) : '' };
-    });
+    return stdout
+        .trim()
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => {
+            const [hash, date] = line.split(' ');
+            return { hash, date: date ? date.substring(0, 10) : '' };
+        });
 }
 
 function countGitGrepOutput(stdout: string): number {
-    return stdout.trim().split('\n').reduce((total, line) => {
-        const parts = line.split(':');
-        const n = parseInt(parts[parts.length - 1], 10);
-        return isNaN(n) ? total : total + n;
-    }, 0);
+    return stdout
+        .trim()
+        .split('\n')
+        .reduce((total, line) => {
+            const parts = line.split(':');
+            const n = parseInt(parts[parts.length - 1], 10);
+            return isNaN(n) ? total : total + n;
+        }, 0);
 }
 
 function completeTrendData(
@@ -238,9 +284,12 @@ function generateTrendChart(context: vscode.ExtensionContext): string {
     const trend: TrendPoint[] = context.workspaceState.get('todoTrend') || [];
     if (trend.length < 2) return '<p class="muted">Trend data collecting... Refresh to update.</p>';
 
-    const width = 400, height = 120, padX = 40, padY = 20;
-    const maxCount = Math.max(...trend.map(t => t.count), 1);
-    const minCount = Math.min(...trend.map(t => t.count));
+    const width = 400,
+        height = 120,
+        padX = 40,
+        padY = 20;
+    const maxCount = Math.max(...trend.map((t) => t.count), 1);
+    const minCount = Math.min(...trend.map((t) => t.count));
     const range = maxCount - minCount || 1;
     const stepX = (width - padX * 2) / (trend.length - 1);
 
@@ -251,21 +300,64 @@ function generateTrendChart(context: vscode.ExtensionContext): string {
     trend.forEach((point, i) => {
         const x = padX + i * stepX;
         const y = padY + (1 - (point.count - minCount) / range) * (height - padY * 2);
-        if (i === 0) { pathD += 'M' + x.toFixed(1) + ',' + y.toFixed(1); }
-        else { pathD += ' L' + x.toFixed(1) + ',' + y.toFixed(1); }
-        dots += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="3" fill="#36A2EB"><title>' + point.date + ': ' + point.count + '</title></circle>';
+        if (i === 0) {
+            pathD += 'M' + x.toFixed(1) + ',' + y.toFixed(1);
+        } else {
+            pathD += ' L' + x.toFixed(1) + ',' + y.toFixed(1);
+        }
+        dots +=
+            '<circle cx="' +
+            x.toFixed(1) +
+            '" cy="' +
+            y.toFixed(1) +
+            '" r="3" fill="#36A2EB"><title>' +
+            point.date +
+            ': ' +
+            point.count +
+            '</title></circle>';
         if (i === 0 || i === trend.length - 1 || i === Math.floor(trend.length / 2)) {
-            labels += '<text x="' + x.toFixed(1) + '" y="' + (height - 2) + '" text-anchor="middle" font-size="9" fill="currentColor">' + point.date.substring(5) + '</text>';
+            labels +=
+                '<text x="' +
+                x.toFixed(1) +
+                '" y="' +
+                (height - 2) +
+                '" text-anchor="middle" font-size="9" fill="currentColor">' +
+                point.date.substring(5) +
+                '</text>';
         }
     });
 
     // Y-axis labels
-    const yLabels = '<text x="2" y="' + (padY + 4) + '" font-size="9" fill="currentColor">' + maxCount + '</text>' +
-        '<text x="2" y="' + (height - padY) + '" font-size="9" fill="currentColor">' + minCount + '</text>';
+    const yLabels =
+        '<text x="2" y="' +
+        (padY + 4) +
+        '" font-size="9" fill="currentColor">' +
+        maxCount +
+        '</text>' +
+        '<text x="2" y="' +
+        (height - padY) +
+        '" font-size="9" fill="currentColor">' +
+        minCount +
+        '</text>';
 
-    return '<svg width="' + width + '" height="' + height + '" viewBox="0 0 ' + width + ' ' + height + '">' +
-        '<path d="' + pathD + '" fill="none" stroke="#36A2EB" stroke-width="2" opacity="0.9"/>' +
-        dots + labels + yLabels + '</svg>';
+    return (
+        '<svg width="' +
+        width +
+        '" height="' +
+        height +
+        '" viewBox="0 0 ' +
+        width +
+        ' ' +
+        height +
+        '">' +
+        '<path d="' +
+        pathD +
+        '" fill="none" stroke="#36A2EB" stroke-width="2" opacity="0.9"/>' +
+        dots +
+        labels +
+        yLabels +
+        '</svg>'
+    );
 }
 
 const CHART_COLORS = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#C9CBCF', '#7BC8A4'];
@@ -275,7 +367,9 @@ function generatePieChart(counts: Record<string, number>): string {
     const total = entries.reduce((s, [, v]) => s + v, 0);
     if (total === 0) return '<p class="muted">No data</p>';
 
-    const cx = 80, cy = 80, r = 70;
+    const cx = 80,
+        cy = 80,
+        r = 70;
     let startAngle = -Math.PI / 2;
     let paths = '';
     let legend = '<div class="legend">';
@@ -290,11 +384,40 @@ function generatePieChart(counts: Record<string, number>): string {
         const y2 = cy + r * Math.sin(endAngle);
         const color = CHART_COLORS[i % CHART_COLORS.length];
 
-        paths += '<path d="M' + cx + ',' + cy + ' L' + x1.toFixed(2) + ',' + y1.toFixed(2) +
-            ' A' + r + ',' + r + ' 0 ' + largeArc + ',1 ' + x2.toFixed(2) + ',' + y2.toFixed(2) +
-            ' Z" fill="' + color + '" opacity="0.85"><title>' + escapeHtml(tag) + ': ' + count + '</title></path>';
-        legend += '<span class="legend-item"><span class="legend-dot" style="background:' + color + '"></span>' +
-            escapeHtml(tag) + ' (' + Math.round(count / total * 100) + '%)</span>';
+        paths +=
+            '<path d="M' +
+            cx +
+            ',' +
+            cy +
+            ' L' +
+            x1.toFixed(2) +
+            ',' +
+            y1.toFixed(2) +
+            ' A' +
+            r +
+            ',' +
+            r +
+            ' 0 ' +
+            largeArc +
+            ',1 ' +
+            x2.toFixed(2) +
+            ',' +
+            y2.toFixed(2) +
+            ' Z" fill="' +
+            color +
+            '" opacity="0.85"><title>' +
+            escapeHtml(tag) +
+            ': ' +
+            count +
+            '</title></path>';
+        legend +=
+            '<span class="legend-item"><span class="legend-dot" style="background:' +
+            color +
+            '"></span>' +
+            escapeHtml(tag) +
+            ' (' +
+            Math.round((count / total) * 100) +
+            '%)</span>';
         startAngle = endAngle;
     });
 
@@ -307,7 +430,10 @@ function generateBarChart(counts: Record<string, number>): string {
     if (entries.length === 0) return '<p class="muted">No data</p>';
 
     const max = Math.max(...entries.map(([, v]) => v));
-    const barWidth = 36, gap = 8, chartHeight = 120, labelHeight = 20;
+    const barWidth = 36,
+        gap = 8,
+        chartHeight = 120,
+        labelHeight = 20;
     const svgWidth = entries.length * (barWidth + gap);
     let bars = '';
 
@@ -317,35 +443,91 @@ function generateBarChart(counts: Record<string, number>): string {
         const y = chartHeight - labelHeight - barHeight;
         const color = CHART_COLORS[i % CHART_COLORS.length];
 
-        bars += '<rect x="' + x + '" y="' + y.toFixed(1) + '" width="' + barWidth + '" height="' + barHeight.toFixed(1) +
-            '" fill="' + color + '" opacity="0.85"><title>' + escapeHtml(tag) + ': ' + count + '</title></rect>';
-        bars += '<text x="' + (x + barWidth / 2) + '" y="' + (y - 4).toFixed(1) +
-            '" text-anchor="middle" font-size="10" fill="currentColor">' + count + '</text>';
-        bars += '<text x="' + (x + barWidth / 2) + '" y="' + (chartHeight - 4) +
-            '" text-anchor="middle" font-size="9" fill="currentColor">' + escapeHtml(tag.substring(0, 5)) + '</text>';
+        bars +=
+            '<rect x="' +
+            x +
+            '" y="' +
+            y.toFixed(1) +
+            '" width="' +
+            barWidth +
+            '" height="' +
+            barHeight.toFixed(1) +
+            '" fill="' +
+            color +
+            '" opacity="0.85"><title>' +
+            escapeHtml(tag) +
+            ': ' +
+            count +
+            '</title></rect>';
+        bars +=
+            '<text x="' +
+            (x + barWidth / 2) +
+            '" y="' +
+            (y - 4).toFixed(1) +
+            '" text-anchor="middle" font-size="10" fill="currentColor">' +
+            count +
+            '</text>';
+        bars +=
+            '<text x="' +
+            (x + barWidth / 2) +
+            '" y="' +
+            (chartHeight - 4) +
+            '" text-anchor="middle" font-size="9" fill="currentColor">' +
+            escapeHtml(tag.substring(0, 5)) +
+            '</text>';
     });
 
-    return '<svg width="' + svgWidth + '" height="' + chartHeight + '" viewBox="0 0 ' + svgWidth + ' ' + chartHeight + '">' + bars + '</svg>';
+    return (
+        '<svg width="' +
+        svgWidth +
+        '" height="' +
+        chartHeight +
+        '" viewBox="0 0 ' +
+        svgWidth +
+        ' ' +
+        chartHeight +
+        '">' +
+        bars +
+        '</svg>'
+    );
 }
 
 function metric(label: string, value: unknown): string {
-    return '<div class="metric"><span class="muted">' + escapeHtml(label) + '</span><strong>' + escapeHtml(String(value)) + '</strong></div>';
+    return (
+        '<div class="metric"><span class="muted">' +
+        escapeHtml(label) +
+        '</span><strong>' +
+        escapeHtml(String(value)) +
+        '</strong></div>'
+    );
 }
 
 function selectControl(label: string, command: string, value: string, options: string[]): string {
-    return '<div><label>' + escapeHtml(label) + '</label><select data-command="' + command + '">' +
-        options.map((option) => {
-            return '<option value="' + escapeHtml(option) + '"' + (option === value ? ' selected' : '') + '>' + escapeHtml(option) + '</option>';
-        }).join('') +
-        '</select></div>';
+    return (
+        '<div><label>' +
+        escapeHtml(label) +
+        '</label><select data-command="' +
+        command +
+        '">' +
+        options
+            .map((option) => {
+                return (
+                    '<option value="' +
+                    escapeHtml(option) +
+                    '"' +
+                    (option === value ? ' selected' : '') +
+                    '>' +
+                    escapeHtml(option) +
+                    '</option>'
+                );
+            })
+            .join('') +
+        '</select></div>'
+    );
 }
 
 function escapeHtml(text: unknown): string {
-    return String(text)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
+    return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 module.exports.show = show;
@@ -353,5 +535,5 @@ module.exports.refresh = refresh;
 module.exports.__test = {
     parseGitLog,
     countGitGrepOutput,
-    completeTrendData
+    completeTrendData,
 };

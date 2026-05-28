@@ -17,7 +17,12 @@ interface GitScannerOptions {
     getOptions(filename: string): Record<string, unknown>;
     scannerClient: {
         enabled(context: vscode.ExtensionContext, options: Record<string, unknown>): boolean;
-        scanFile(context: vscode.ExtensionContext, root: string, filename: string, options: Record<string, unknown>): Promise<unknown[]>;
+        scanFile(
+            context: vscode.ExtensionContext,
+            root: string,
+            filename: string,
+            options: Record<string, unknown>
+        ): Promise<unknown[]>;
     };
     ripgrep: {
         search(root: string, options: Record<string, unknown>): Promise<unknown[]>;
@@ -41,25 +46,31 @@ function scanGitFiles(options: GitScannerOptions, staged: boolean): void {
     options.provider.clear(vscode.workspace.workspaceFolders);
     options.setInterrupted(false);
 
-    options.statusBarIndicator.text = staged ? 'Todo-Tree: Scanning staged files...' : 'Todo-Tree: Scanning changed files...';
+    options.statusBarIndicator.text = staged
+        ? 'Todo-Tree: Scanning staged files...'
+        : 'Todo-Tree: Scanning changed files...';
     options.statusBarIndicator.show();
 
     const collector = staged ? gitFiles.stagedFiles : gitFiles.changedFiles;
-    collector(roots).then((files: string[]) => {
-        if (files.length === 0) {
-            options.todoTreeView.message = staged ? 'No staged Git files found.' : 'No changed Git files found.';
-            options.addResultsToTree();
-            return undefined;
-        }
+    collector(roots)
+        .then((files: string[]) => {
+            if (files.length === 0) {
+                options.todoTreeView.message = staged ? 'No staged Git files found.' : 'No changed Git files found.';
+                options.addResultsToTree();
+                return undefined;
+            }
 
-        options.debug('Scanning ' + files.length + ' Git file(s)');
-        return files.reduce((promise, file) => {
-            return promise.then(() => scanFilePath(options, file));
-        }, Promise.resolve()).then(options.addResultsToTree);
-    }).catch((e: Error) => {
-        vscode.window.showErrorMessage('Todo Tree: Git scan failed: ' + e.message);
-        options.addResultsToTree();
-    });
+            options.debug('Scanning ' + files.length + ' Git file(s)');
+            return files
+                .reduce((promise, file) => {
+                    return promise.then(() => scanFilePath(options, file));
+                }, Promise.resolve())
+                .then(options.addResultsToTree);
+        })
+        .catch((e: Error) => {
+            vscode.window.showErrorMessage('Todo Tree: Git scan failed: ' + e.message);
+            options.addResultsToTree();
+        });
 }
 
 function scanFilePath(options: GitScannerOptions, filename: string): Promise<void> {
@@ -67,15 +78,18 @@ function scanFilePath(options: GitScannerOptions, filename: string): Promise<voi
     let scanOptions = options.getOptions(root);
 
     if (options.scannerClient.enabled(options.context, scanOptions) === true) {
-        return options.scannerClient.scanFile(options.context, root, filename, scanOptions).then((matches) => {
-            options.addMatches(matches, { filename: filename }, 'Rust Git File');
-        }).catch((e: Error) => {
-            options.debug('Rust git file scan failed; falling back to ripgrep: ' + e.message);
-            const fallbackOptions = options.getOptions(filename);
-            return options.ripgrep.search('/', fallbackOptions).then((matches) => {
-                options.addMatches(matches, fallbackOptions, 'Git File');
+        return options.scannerClient
+            .scanFile(options.context, root, filename, scanOptions)
+            .then((matches) => {
+                options.addMatches(matches, { filename: filename }, 'Rust Git File');
+            })
+            .catch((e: Error) => {
+                options.debug('Rust git file scan failed; falling back to ripgrep: ' + e.message);
+                const fallbackOptions = options.getOptions(filename);
+                return options.ripgrep.search('/', fallbackOptions).then((matches) => {
+                    options.addMatches(matches, fallbackOptions, 'Git File');
+                });
             });
-        });
     }
 
     scanOptions = options.getOptions(filename);
@@ -107,12 +121,13 @@ function getRootForFile(filename: string, getRootFolders: () => string[]): strin
 
     roots = roots.sort((a, b) => b.length - a.length);
 
-    return roots.find((root) => {
-        return filename === root || filename.indexOf(root + path.sep) === 0;
-    }) || path.dirname(filename);
+    return (
+        roots.find((root) => {
+            return filename === root || filename.indexOf(root + path.sep) === 0;
+        }) || path.dirname(filename)
+    );
 }
 
 module.exports.scanGitFiles = scanGitFiles;
 module.exports.getGitRoots = getGitRoots;
 module.exports.getRootForFile = getRootForFile;
-

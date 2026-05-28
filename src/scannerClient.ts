@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-var-requires */
-
 import * as child_process from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
@@ -35,7 +33,7 @@ function candidatePaths(context: ExtensionContextLike): string[] {
     return [
         path.join(extensionRoot, 'scanner', 'target', 'release', exe),
         path.join(extensionRoot, 'scanner', 'target', 'debug', exe),
-        path.join(extensionRoot, 'bin', exe)
+        path.join(extensionRoot, 'bin', exe),
     ];
 }
 
@@ -99,14 +97,19 @@ function writeConfig(context: ExtensionContextLike, options: ScannerOptions): st
         exclude_globs: globs.excludeGlobs,
         include_hidden_files: options.includeHiddenFiles === true,
         max_file_size: options.maxFileSize || 1024 * 1024,
-        native_markdown: true
+        native_markdown: true,
     };
 
     fs.writeFileSync(configPath, JSON.stringify(scannerConfig), 'utf8');
     return configPath;
 }
 
-function execScanner(context: ExtensionContextLike, command: string, args: string[], options: ScannerOptions): Promise<ScanOutput> {
+function execScanner(
+    context: ExtensionContextLike,
+    command: string,
+    args: string[],
+    options: ScannerOptions
+): Promise<ScanOutput> {
     return new Promise((resolve, reject) => {
         const exe = scannerPath(context);
         if (!exe) {
@@ -119,22 +122,27 @@ function execScanner(context: ExtensionContextLike, command: string, args: strin
             options.outputChannel.appendLine('Todo Tree scanner: ' + exe + ' ' + fullArgs.join(' '));
         }
 
-        currentProcess = child_process.execFile(exe, fullArgs, { maxBuffer: 50 * 1024 * 1024 }, (error, stdout, stderr) => {
-            currentProcess = undefined;
+        currentProcess = child_process.execFile(
+            exe,
+            fullArgs,
+            { maxBuffer: 50 * 1024 * 1024 },
+            (error, stdout, stderr) => {
+                currentProcess = undefined;
 
-            if (error) {
-                (error as Error & { stderr?: string }).stderr = stderr;
-                reject(error);
-                return;
-            }
+                if (error) {
+                    (error as Error & { stderr?: string }).stderr = stderr;
+                    reject(error);
+                    return;
+                }
 
-            try {
-                resolve(JSON.parse(stdout) as ScanOutput);
-            } catch (parseError) {
-                (parseError as Error & { stderr?: string }).stderr = stderr;
-                reject(parseError);
+                try {
+                    resolve(JSON.parse(stdout) as ScanOutput);
+                } catch (parseError) {
+                    (parseError as Error & { stderr?: string }).stderr = stderr;
+                    reject(parseError);
+                }
             }
-        });
+        );
     });
 }
 
@@ -150,34 +158,52 @@ function toMatch(item: TodoItem): ScannerMatch {
             priority: item.priority,
             assignee: item.assignee,
             dueDate: item.dueDate || item.due_date,
-            labels: item.labels
-        }
+            labels: item.labels,
+        },
     };
 }
 
 function scanWorkspace(context: ExtensionContextLike, root: string, options: ScannerOptions): Promise<ScannerMatch[]> {
     const configPath = writeConfig(context, options);
-    return execScanner(context, 'scan-workspace', ['--root', root, '--config', configPath], options)
-        .then((output) => {
-            if (options.outputChannel) {
-                options.outputChannel.appendLine(
-                    'Todo Tree scanner: ' + output.total_items + ' items in ' +
-                    output.scanned_files + ' files, ' + output.elapsed_ms + 'ms'
-                );
-            }
-            return output.items.map(toMatch);
-        });
+    return execScanner(context, 'scan-workspace', ['--root', root, '--config', configPath], options).then((output) => {
+        if (options.outputChannel) {
+            options.outputChannel.appendLine(
+                'Todo Tree scanner: ' +
+                    output.total_items +
+                    ' items in ' +
+                    output.scanned_files +
+                    ' files, ' +
+                    output.elapsed_ms +
+                    'ms'
+            );
+        }
+        return output.items.map(toMatch);
+    });
 }
 
-function scanFile(context: ExtensionContextLike, root: string, filename: string, options: ScannerOptions): Promise<ScannerMatch[]> {
+function scanFile(
+    context: ExtensionContextLike,
+    root: string,
+    filename: string,
+    options: ScannerOptions
+): Promise<ScannerMatch[]> {
     const configPath = writeConfig(context, options);
-    return execScanner(context, 'scan-file', ['--root', root, '--file', filename, '--config', configPath], options)
-        .then((output) => output.items.map(toMatch));
+    return execScanner(
+        context,
+        'scan-file',
+        ['--root', root, '--file', filename, '--config', configPath],
+        options
+    ).then((output) => output.items.map(toMatch));
 }
 
 function getAgentContext(context: ExtensionContextLike, root: string, options: ScannerOptions): Promise<AgentContext> {
     const configPath = writeConfig(context, options);
-    return execScanner(context, 'agent-context', ['--root', root, '--config', configPath], options) as Promise<unknown> as Promise<AgentContext>;
+    return execScanner(
+        context,
+        'agent-context',
+        ['--root', root, '--config', configPath],
+        options
+    ) as Promise<unknown> as Promise<AgentContext>;
 }
 
 function kill(): void {

@@ -4,7 +4,11 @@ import { AgentAnnotation, AgentContext, AgentTodoItem } from './types';
 
 interface ScannerClient {
     enabled(context: vscode.ExtensionContext, options: Record<string, unknown>): boolean;
-    getAgentContext(context: vscode.ExtensionContext, root: string, options: Record<string, unknown>): Promise<AgentContext>;
+    getAgentContext(
+        context: vscode.ExtensionContext,
+        root: string,
+        options: Record<string, unknown>
+    ): Promise<AgentContext>;
 }
 
 interface AgentInterfaceOptions {
@@ -46,7 +50,9 @@ async function getAgentContext(options: AgentInterfaceOptions, request?: { root?
     for (const root of roots) {
         const scanOptions = options.getOptions(root);
         if (options.scannerClient.enabled(options.context, scanOptions) !== true) {
-            throw new Error('Todo Tree: Agent context requires the Rust scanner. Set todo-tree.scanner.engine to auto or rust.');
+            throw new Error(
+                'Todo Tree: Agent context requires the Rust scanner. Set todo-tree.scanner.engine to auto or rust.'
+            );
         }
         contexts.push(await options.scannerClient.getAgentContext(options.context, root, scanOptions));
     }
@@ -66,13 +72,13 @@ function mergeAgentContexts(contexts: AgentContext[]): AgentContext {
     }
 
     const items = contexts
-        .flatMap(context => context.items)
+        .flatMap((context) => context.items)
         .sort((a, b) => a.recommendedOrder - b.recommendedOrder || a.file.localeCompare(b.file) || a.line - b.line)
         .map((item, index) => ({ ...item, recommendedOrder: index + 1 }));
 
     return {
         schemaVersion: 1,
-        workspace: contexts.map(context => context.workspace).join(';'),
+        workspace: contexts.map((context) => context.workspace).join(';'),
         generatedAt: Math.floor(Date.now() / 1000),
         summary: {
             total: items.length,
@@ -95,7 +101,7 @@ function annotateAgentFinding(input: AgentAnnotationInput): number {
         .filter((annotation): annotation is AgentAnnotation => annotation !== undefined);
 
     const byFile = new Map<string, vscode.Diagnostic[]>();
-    annotations.forEach(annotation => {
+    annotations.forEach((annotation) => {
         const file = resolveFile(annotation.file);
         const uri = vscode.Uri.file(file);
         const existing = byFile.get(file) || Array.from(diagnostics?.get(uri) || []);
