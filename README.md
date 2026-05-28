@@ -22,7 +22,7 @@
   <img src="https://img.shields.io/badge/Rust-scanner-orange?logo=rust" alt="Rust scanner">
   <img src="https://img.shields.io/badge/TypeScript-modular-blue?logo=typescript" alt="TypeScript">
   <img src="https://img.shields.io/badge/AI%20Agent-ready-6f42c1" alt="AI Agent ready">
-  <img src="https://img.shields.io/badge/tests-135%20passing-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/tests-158%20passing-brightgreen" alt="Tests">
 </p>
 
 <p align="center">
@@ -175,6 +175,10 @@ VS Code extension
   filterQuery.ts        Structured filter parser
   gitScanner.ts         Git changed/staged scan
   debtReport.ts         Git TODO debt report
+  constants.ts          Shared constants (scan modes, status bar, buttons)
+  globUtils.ts          Glob building utilities for ripgrep
+  config.js             Configuration reader with caching layer
+  searchResults.js      Map-indexed search result store
 
 Rust scanner
   main.rs               scan-workspace, scan-file, agent-context, benchmark
@@ -190,6 +194,9 @@ npm install
 npm run scanner:build
 npm run webpack
 npm test
+npm run lint:check
+npm run format:check
+npm run test:coverage
 cargo test --manifest-path scanner/Cargo.toml
 ```
 
@@ -204,9 +211,9 @@ Test coverage:
 
 | Type | Count |
 | --- | ---: |
-| QUnit tests | 97 |
+| QUnit tests | 120 |
 | Rust tests | 38 |
-| Total | 135 |
+| Total | 158 |
 
 ## Configuration
 

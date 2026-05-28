@@ -22,7 +22,7 @@
   <img src="https://img.shields.io/badge/Rust-scanner-orange?logo=rust" alt="Rust scanner">
   <img src="https://img.shields.io/badge/TypeScript-modular-blue?logo=typescript" alt="TypeScript">
   <img src="https://img.shields.io/badge/AI%20Agent-ready-6f42c1" alt="AI Agent ready">
-  <img src="https://img.shields.io/badge/tests-135%20passing-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/tests-158%20passing-brightgreen" alt="Tests">
 </p>
 
 <p align="center">
@@ -175,6 +175,10 @@ VS Code 插件层
   filterQuery.ts        结构化过滤解析
   gitScanner.ts         Git changed/staged 扫描
   debtReport.ts         Git TODO 债务报告
+  constants.ts          共享常量（扫描模式、状态栏、按钮）
+  globUtils.ts          ripgrep glob 构建工具
+  config.js             配置读取层（带缓存）
+  searchResults.js      Map 索引的搜索结果存储
 
 Rust 扫描器
   main.rs               scan-workspace、scan-file、agent-context、benchmark
@@ -190,6 +194,9 @@ npm install
 npm run scanner:build
 npm run webpack
 npm test
+npm run lint:check
+npm run format:check
+npm run test:coverage
 cargo test --manifest-path scanner/Cargo.toml
 ```
 
@@ -204,9 +211,9 @@ npx --yes @vscode/vsce package
 
 | 类型 | 数量 |
 | --- | ---: |
-| QUnit 测试 | 97 |
+| QUnit 测试 | 120 |
 | Rust 测试 | 38 |
-| 总计 | 135 |
+| 总计 | 158 |
 
 ## 配置
 
