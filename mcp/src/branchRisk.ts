@@ -1,6 +1,6 @@
-import * as child_process from 'child_process';
 import { AgentContext, AgentTodoItem, TodoPriority } from './types.js';
 import { DebtItem, DebtReport } from './debtReport.js';
+import { execGit } from './git.js';
 
 export type BranchRiskLevel = 'low' | 'medium' | 'high';
 export type BranchRiskSeverity = 'info' | 'warning' | 'error';
@@ -35,18 +35,6 @@ export interface BranchTodoRiskReport {
     removed: DebtItem[];
     risks: BranchRiskItem[];
     markdown: string;
-}
-
-function execGit(args: string[], cwd: string): Promise<string> {
-    return new Promise((resolve, reject) => {
-        child_process.execFile('git', args, { cwd, maxBuffer: 10 * 1024 * 1024 }, (err, stdout) => {
-            if (err) {
-                reject(err);
-                return;
-            }
-            resolve(stdout);
-        });
-    });
 }
 
 export async function getChangedFilesSinceBase(root: string, baseBranch: string): Promise<string[]> {

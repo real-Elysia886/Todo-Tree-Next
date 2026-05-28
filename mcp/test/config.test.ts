@@ -59,4 +59,16 @@ describe('loadConfig', () => {
         const config = loadConfig(tmpDir);
         expect(config.tags).toEqual(['ENV_TAG']);
     });
+
+    it('throws when workspace config JSON is invalid', () => {
+        const configDir = path.join(tmpDir, '.todo-tree');
+        fs.mkdirSync(configDir, { recursive: true });
+        fs.writeFileSync(path.join(configDir, 'config.json'), '{not json');
+        expect(() => loadConfig(tmpDir)).toThrow(/Failed to load Todo Tree config/);
+    });
+
+    it('throws when TODO_TREE_CONFIG points to a missing file', () => {
+        process.env.TODO_TREE_CONFIG = path.join(tmpDir, 'missing.json');
+        expect(() => loadConfig(tmpDir)).toThrow(/TODO_TREE_CONFIG file not found/);
+    });
 });

@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { fileURLToPath } from 'url';
 
 export interface ScannerConfig {
     tags: string[];
@@ -30,9 +31,10 @@ function executableName(): string {
 
 function candidateScannerPaths(): string[] {
     const exe = executableName();
-    const mcpDir = path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Z]:)/, '$1'));
+    const mcpDir = path.dirname(fileURLToPath(import.meta.url));
 
     return [
+        path.join(mcpDir, '..', 'bin', exe),
         path.join(mcpDir, '..', '..', 'bin', exe),
         path.join(process.cwd(), 'bin', exe),
         path.join(process.cwd(), 'scanner', 'target', 'release', exe),
@@ -50,24 +52,30 @@ function findScannerPath(): string {
 }
 
 function loadConfigFile(root: string): Partial<ScannerConfig> {
-    const candidates = [
-        path.join(root, '.todo-tree', 'config.json'),
-        path.join(os.homedir(), '.config', 'todo-tree', 'config.json'),
+    const candidates: Array<{ path: string; required: boolean }> = [
+        { path: path.join(root, '.todo-tree', 'config.json'), required: false },
+        { path: path.join(os.homedir(), '.config', 'todo-tree', 'config.json'), required: false },
     ];
 
     const envConfig = process.env.TODO_TREE_CONFIG;
     if (envConfig) {
-        candidates.unshift(envConfig);
+        candidates.unshift({ path: envConfig, required: true });
     }
 
-    for (const configPath of candidates) {
-        try {
-            if (fs.existsSync(configPath)) {
-                const raw = fs.readFileSync(configPath, 'utf8');
-                return JSON.parse(raw);
+    for (const candidate of candidates) {
+        if (!fs.existsSync(candidate.path)) {
+            if (candidate.required) {
+                throw new Error(`TODO_TREE_CONFIG file not found: ${candidate.path}`);
             }
-        } catch {
-            // ignore parse errors
+            continue;
+        }
+
+        try {
+            const raw = fs.readFileSync(candidate.path, 'utf8');
+            return JSON.parse(raw);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            throw new Error(`Failed to load Todo Tree config ${candidate.path}: ${message}`);
         }
     }
 

@@ -1,4 +1,4 @@
-import * as child_process from 'child_process';
+import { execGit } from './git.js';
 
 export interface DebtItem {
     file: string;
@@ -15,18 +15,6 @@ export interface DebtReport {
     added: DebtItem[];
     removed: DebtItem[];
     summary: { added: number; removed: number; net: number };
-}
-
-function execGit(args: string[], cwd: string): Promise<string> {
-    return new Promise((resolve, reject) => {
-        child_process.execFile('git', args, { cwd, maxBuffer: 10 * 1024 * 1024 }, (err, stdout) => {
-            if (err) {
-                reject(err);
-                return;
-            }
-            resolve(stdout);
-        });
-    });
 }
 
 async function getCurrentBranch(root: string): Promise<string> {
@@ -46,11 +34,21 @@ export async function getDefaultBaseBranch(root: string): Promise<string> {
     return 'main';
 }
 
+function findTodoTag(text: string, tags: string[]): string | undefined {
+    if (tags.length === 0) {
+        return undefined;
+    }
+    const tagPattern = new RegExp(
+        '(^|[^A-Za-z0-9_])(' +
+            tags.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') +
+            ')(?=$|[^A-Za-z0-9_])'
+    );
+    const match = text.match(tagPattern);
+    return match ? match[2] : undefined;
+}
+
 export function parseDiffForTodos(diff: string, tags: string[]): DebtItem[] {
     const items: DebtItem[] = [];
-    const tagPattern = new RegExp(
-        '\\b(' + tags.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')\\b'
-    );
     let currentFile = '';
     let lineNumber = 0;
 
@@ -69,21 +67,21 @@ export function parseDiffForTodos(diff: string, tags: string[]): DebtItem[] {
         }
         if (rawLine.startsWith('+') && !rawLine.startsWith('+++')) {
             const content = rawLine.substring(1);
-            const match = content.match(tagPattern);
-            if (match) {
+            const tag = findTodoTag(content, tags);
+            if (tag) {
                 items.push({
                     file: currentFile,
                     line: lineNumber,
-                    tag: match[1],
+                    tag,
                     text: content.trim(),
                     status: 'added',
                 });
             }
         } else if (rawLine.startsWith('-') && !rawLine.startsWith('---')) {
             const content = rawLine.substring(1);
-            const match = content.match(tagPattern);
-            if (match) {
-                items.push({ file: currentFile, line: 0, tag: match[1], text: content.trim(), status: 'removed' });
+            const tag = findTodoTag(content, tags);
+            if (tag) {
+                items.push({ file: currentFile, line: 0, tag, text: content.trim(), status: 'removed' });
             }
         }
     }

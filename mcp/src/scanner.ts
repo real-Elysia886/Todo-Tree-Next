@@ -5,7 +5,12 @@ import * as path from 'path';
 import { AgentContext, ScanOutput, ScannerMatch, TodoItem } from './types.js';
 import { ScannerConfig } from './config.js';
 
-let currentProcess: child_process.ChildProcess | undefined;
+const currentProcesses = new Set<child_process.ChildProcess>();
+
+interface ScannerConfigFile {
+    path: string;
+    cleanup(): void;
+}
 
 function escapeRegexTag(tag: string): string {
     return tag.replace(/[|{}()[\]^$+*?.\\-]/g, '\\$&');
@@ -29,9 +34,9 @@ function splitGlobs(globs?: string[]): { includeGlobs: string[]; excludeGlobs: s
     return result;
 }
 
-function writeConfig(config: ScannerConfig): string {
-    const storagePath = os.tmpdir();
-    const configPath = path.join(storagePath, 'todo-scanner-config.json');
+function writeConfig(config: ScannerConfig): ScannerConfigFile {
+    const storagePath = fs.mkdtempSync(path.join(os.tmpdir(), 'todo-tree-scanner-'));
+    const configPath = path.join(storagePath, 'config.json');
     const scannerConfig = {
         regex: expandTags(config.regex, config.tags),
         case_sensitive: config.caseSensitive,
@@ -43,7 +48,12 @@ function writeConfig(config: ScannerConfig): string {
         native_markdown: true,
     };
     fs.writeFileSync(configPath, JSON.stringify(scannerConfig), 'utf8');
-    return configPath;
+    return {
+        path: configPath,
+        cleanup(): void {
+            fs.rmSync(storagePath, { recursive: true, force: true });
+        },
+    };
 }
 
 function execScanner(scannerPath: string, command: string, args: string[]): Promise<ScanOutput> {
@@ -54,12 +64,12 @@ function execScanner(scannerPath: string, command: string, args: string[]): Prom
         }
 
         const fullArgs = [command].concat(args);
-        currentProcess = child_process.execFile(
+        const scannerProcess = child_process.execFile(
             scannerPath,
             fullArgs,
             { maxBuffer: 50 * 1024 * 1024 },
             (error, stdout, stderr) => {
-                currentProcess = undefined;
+                currentProcesses.delete(scannerProcess);
                 if (error) {
                     (error as Error & { stderr?: string }).stderr = stderr;
                     reject(error);
@@ -73,7 +83,22 @@ function execScanner(scannerPath: string, command: string, args: string[]): Prom
                 }
             }
         );
+        currentProcesses.add(scannerProcess);
     });
+}
+
+function runScannerWithConfig<T>(
+    config: ScannerConfig,
+    command: string,
+    args: string[],
+    mapper: (output: ScanOutput) => T
+): Promise<T> {
+    const configFile = writeConfig(config);
+    return execScanner(config.scannerPath, command, args.concat(['--config', configFile.path]))
+        .then(mapper)
+        .finally(() => {
+            configFile.cleanup();
+        });
 }
 
 function toMatch(item: TodoItem): ScannerMatch {
@@ -94,36 +119,28 @@ function toMatch(item: TodoItem): ScannerMatch {
 }
 
 export function scanWorkspace(root: string, config: ScannerConfig): Promise<ScannerMatch[]> {
-    const configPath = writeConfig(config);
-    return execScanner(config.scannerPath, 'scan-workspace', ['--root', root, '--config', configPath]).then((output) =>
+    return runScannerWithConfig(config, 'scan-workspace', ['--root', root], (output) => output.items.map(toMatch));
+}
+
+export function scanFile(root: string, filename: string, config: ScannerConfig): Promise<ScannerMatch[]> {
+    return runScannerWithConfig(config, 'scan-file', ['--root', root, '--file', filename], (output) =>
         output.items.map(toMatch)
     );
 }
 
-export function scanFile(root: string, filename: string, config: ScannerConfig): Promise<ScannerMatch[]> {
-    const configPath = writeConfig(config);
-    return execScanner(config.scannerPath, 'scan-file', [
-        '--root',
-        root,
-        '--file',
-        filename,
-        '--config',
-        configPath,
-    ]).then((output) => output.items.map(toMatch));
-}
-
 export function getAgentContext(root: string, config: ScannerConfig): Promise<AgentContext> {
-    const configPath = writeConfig(config);
-    return execScanner(config.scannerPath, 'agent-context', [
-        '--root',
-        root,
-        '--config',
-        configPath,
-    ]) as Promise<unknown> as Promise<AgentContext>;
+    return runScannerWithConfig(
+        config,
+        'agent-context',
+        ['--root', root],
+        (output) => output as unknown as AgentContext
+    );
 }
 
-export function kill(): void {
-    if (currentProcess !== undefined) {
-        currentProcess.kill('SIGINT');
-    }
+export function kill(): number {
+    const processes = Array.from(currentProcesses);
+    processes.forEach((process) => {
+        process.kill('SIGINT');
+    });
+    return processes.length;
 }

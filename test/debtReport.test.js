@@ -3,7 +3,22 @@
 
 function parseDiffForTodos(diff, tags) {
     const items = [];
-    const tagPattern = new RegExp('\\b(' + tags.map(function(t) { return t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }).join('|') + ')\\b');
+    function findTodoTag(text) {
+        if (tags.length === 0) {
+            return undefined;
+        }
+        const tagPattern = new RegExp(
+            '(^|[^A-Za-z0-9_])(' +
+                tags
+                    .map(function (t) {
+                        return t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    })
+                    .join('|') +
+                ')(?=$|[^A-Za-z0-9_])'
+        );
+        const match = text.match(tagPattern);
+        return match ? match[2] : undefined;
+    }
     let currentFile = '';
     let lineNumber = 0;
 
@@ -24,15 +39,15 @@ function parseDiffForTodos(diff, tags) {
         }
         if (rawLine.startsWith('+') && !rawLine.startsWith('+++')) {
             var content = rawLine.substring(1);
-            var match = content.match(tagPattern);
-            if (match) {
-                items.push({ file: currentFile, line: lineNumber, tag: match[1], text: content.trim(), status: 'added' });
+            var tag = findTodoTag(content);
+            if (tag) {
+                items.push({ file: currentFile, line: lineNumber, tag: tag, text: content.trim(), status: 'added' });
             }
         } else if (rawLine.startsWith('-') && !rawLine.startsWith('---')) {
             var content2 = rawLine.substring(1);
-            var match2 = content2.match(tagPattern);
-            if (match2) {
-                items.push({ file: currentFile, line: 0, tag: match2[1], text: content2.trim(), status: 'removed' });
+            var tag2 = findTodoTag(content2);
+            if (tag2) {
+                items.push({ file: currentFile, line: 0, tag: tag2, text: content2.trim(), status: 'removed' });
             }
         }
     }
@@ -41,7 +56,7 @@ function parseDiffForTodos(diff, tags) {
 
 QUnit.module('debtReport.parseDiffForTodos');
 
-QUnit.test('parses added TODO from diff', function(assert) {
+QUnit.test('parses added TODO from diff', function (assert) {
     var diff = [
         'diff --git a/src/main.ts b/src/main.ts',
         '--- a/src/main.ts',
@@ -49,7 +64,7 @@ QUnit.test('parses added TODO from diff', function(assert) {
         '@@ -10,3 +10,4 @@ function foo() {',
         '     return 1;',
         '+    // TODO fix this',
-        '     return 2;'
+        '     return 2;',
     ].join('\n');
 
     var items = parseDiffForTodos(diff, ['TODO', 'FIXME']);
@@ -60,12 +75,12 @@ QUnit.test('parses added TODO from diff', function(assert) {
     assert.equal(items[0].status, 'added');
 });
 
-QUnit.test('parses removed FIXME from diff', function(assert) {
+QUnit.test('parses removed FIXME from diff', function (assert) {
     var diff = [
         '+++ b/src/util.ts',
         '@@ -5,4 +5,3 @@ function bar() {',
         '-    // FIXME old bug',
-        '     return true;'
+        '     return true;',
     ].join('\n');
 
     var items = parseDiffForTodos(diff, ['TODO', 'FIXME']);
@@ -75,14 +90,14 @@ QUnit.test('parses removed FIXME from diff', function(assert) {
     assert.equal(items[0].line, 0);
 });
 
-QUnit.test('handles multiple files in one diff', function(assert) {
+QUnit.test('handles multiple files in one diff', function (assert) {
     var diff = [
         '+++ b/a.ts',
         '@@ -1,2 +1,3 @@',
         '+// TODO first',
         '+++ b/b.ts',
         '@@ -1,2 +1,3 @@',
-        '+// FIXME second'
+        '+// FIXME second',
     ].join('\n');
 
     var items = parseDiffForTodos(diff, ['TODO', 'FIXME']);
@@ -93,20 +108,20 @@ QUnit.test('handles multiple files in one diff', function(assert) {
     assert.equal(items[1].tag, 'FIXME');
 });
 
-QUnit.test('ignores lines without tags', function(assert) {
+QUnit.test('ignores lines without tags', function (assert) {
     var diff = [
         '+++ b/src/main.ts',
         '@@ -1,2 +1,3 @@',
         '+    const x = 1;',
         '+    // just a comment',
-        '-    const y = 2;'
+        '-    const y = 2;',
     ].join('\n');
 
     var items = parseDiffForTodos(diff, ['TODO', 'FIXME']);
     assert.equal(items.length, 0);
 });
 
-QUnit.test('tracks line numbers correctly through context lines', function(assert) {
+QUnit.test('tracks line numbers correctly through context lines', function (assert) {
     var diff = [
         '+++ b/src/main.ts',
         '@@ -1,5 +1,6 @@',
@@ -115,7 +130,7 @@ QUnit.test('tracks line numbers correctly through context lines', function(asser
         ' line3',
         '+// TODO at line 4',
         ' line4',
-        ' line5'
+        ' line5',
     ].join('\n');
 
     var items = parseDiffForTodos(diff, ['TODO']);
@@ -123,18 +138,22 @@ QUnit.test('tracks line numbers correctly through context lines', function(asser
     assert.equal(items[0].line, 4);
 });
 
-QUnit.test('escapes special regex characters in tags', function(assert) {
-    var diff = [
-        '+++ b/README.md',
-        '@@ -1,2 +1,3 @@',
-        '+- [ ] new task'
-    ].join('\n');
+QUnit.test('escapes special regex characters in tags', function (assert) {
+    var diff = ['+++ b/README.md', '@@ -1,2 +1,3 @@', '+- [ ] new task'].join('\n');
 
-    // Note: \b word boundary doesn't match around brackets, so we use a non-word-boundary pattern
     var items = parseDiffForTodos(diff, ['TODO', 'FIXME']);
     assert.equal(items.length, 0, 'no match for TODO/FIXME in markdown task');
 
-    // Test that special chars are escaped properly (no regex crash)
-    var items2 = parseDiffForTodos(diff, ['\\[']);
-    assert.equal(items2.length, 0, 'escaped bracket with word boundary does not match');
+    var items2 = parseDiffForTodos(diff, ['[ ]']);
+    assert.equal(items2.length, 1);
+    assert.equal(items2[0].tag, '[ ]');
+    assert.equal(items2[0].text, '- [ ] new task');
+});
+
+QUnit.test('does not match word tags inside longer identifiers', function (assert) {
+    var diff = ['+++ b/src/app.ts', '@@ -1,2 +1,3 @@', '+const METHODTODO = true;', '+// TODO real'].join('\n');
+
+    var items = parseDiffForTodos(diff, ['TODO']);
+    assert.equal(items.length, 1);
+    assert.equal(items[0].text, '// TODO real');
 });

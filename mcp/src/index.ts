@@ -276,14 +276,14 @@ server.resource(
 );
 
 async function main() {
-    process.on('SIGINT', () => {
+    function shutdown(): void {
         watchers.forEach((w) => w.stop());
+        scanner.kill();
         process.exit(0);
-    });
-    process.on('SIGTERM', () => {
-        watchers.forEach((w) => w.stop());
-        process.exit(0);
-    });
+    }
+
+    process.on('SIGINT', shutdown);
+    process.on('SIGTERM', shutdown);
 
     const transport = new StdioServerTransport();
     await server.connect(transport);
