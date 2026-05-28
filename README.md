@@ -54,14 +54,6 @@ Todo Tree_Next keeps the familiar Todo Tree workflow, then turns it into a moder
 
 ## Install
 
-Search the VS Code Marketplace for:
-
-```text
-Todo Tree_Next
-```
-
-Offline install:
-
 1. Download or build a `.vsix`.
 2. Open the VS Code Extensions view.
 3. Choose `...` > `Install from VSIX...`.

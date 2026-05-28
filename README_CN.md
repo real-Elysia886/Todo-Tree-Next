@@ -54,14 +54,6 @@ Todo Tree_Next 保留 Todo Tree 熟悉的使用体验，同时把它升级为现
 
 ## 安装
 
-在 VS Code 扩展市场搜索：
-
-```text
-Todo Tree_Next
-```
-
-离线安装：
-
 1. 下载或构建 `.vsix`。
 2. 打开 VS Code 扩展面板。
 3. 点击 `...` > `Install from VSIX...`。
