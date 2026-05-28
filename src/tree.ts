@@ -1,12 +1,12 @@
 /* jshint esversion:6 */
 
-const vscode = require('vscode') as typeof import('vscode');
-const path = require('path') as typeof import('path');
+var vscode = require('vscode') as typeof import('vscode');
+var path = require('path') as typeof import('path');
 
-const utils = require('./utils.js') as any;
-const icons = require('./icons.js') as any;
-const config = require('./config.js') as any;
-const filterQuery = require('./filterQuery') as any;
+var utils = require('./utils.js') as any;
+var icons = require('./icons.js') as any;
+var config = require('./config.js') as any;
+var filterQuery = require('./filterQuery') as any;
 
 interface TreeNode {
     type: string;

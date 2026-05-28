@@ -24,6 +24,13 @@ module.exports = [
         },
     },
     {
+        files: ['src/highlights.ts', 'src/tree.ts'],
+        rules: {
+            'prefer-const': 'off',
+            'no-var': 'off',
+        },
+    },
+    {
         ignores: ['dist/', 'node_modules/', 'scanner/target/', '*.js'],
     },
 ];

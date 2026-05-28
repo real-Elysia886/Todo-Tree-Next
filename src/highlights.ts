@@ -1,10 +1,10 @@
-const vscode = require('vscode') as typeof import('vscode');
-const execWithIndices = require('regexp-match-indices').shim();
+var vscode = require('vscode') as typeof import('vscode');
+var execWithIndices = require('regexp-match-indices').shim();
 
-const config = require('./config.js') as any;
-const utils = require('./utils.js') as any;
-const attributes = require('./attributes.js') as any;
-const icons = require('./icons.js') as any;
+var config = require('./config.js') as any;
+var utils = require('./utils.js') as any;
+var attributes = require('./attributes.js') as any;
+var icons = require('./icons.js') as any;
 
 const captureGroupArgument = 'capture-groups';
 type TextEditorDecorationType = import('vscode').TextEditorDecorationType;
