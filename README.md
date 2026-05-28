@@ -22,7 +22,7 @@
   <img src="https://img.shields.io/badge/Rust-scanner-orange?logo=rust" alt="Rust scanner">
   <img src="https://img.shields.io/badge/TypeScript-modular-blue?logo=typescript" alt="TypeScript">
   <img src="https://img.shields.io/badge/AI%20Agent-ready-6f42c1" alt="AI Agent ready">
-  <img src="https://img.shields.io/badge/tests-158%20passing-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/tests-177%20passing-brightgreen" alt="Tests">
 </p>
 
 <p align="center">
@@ -155,9 +155,73 @@ Agent context includes file path, line/column, tag, priority, assignee, due date
 
 Full schema: [docs/AGENT_INTERFACE.md](docs/AGENT_INTERFACE.md)
 
+## MCP Server
+
+An MCP (Model Context Protocol) server is included in `mcp/`, allowing AI CLI tools like Claude Code, Codex CLI, and other MCP-compatible clients to interact with the TODO scanner directly — no VS Code required.
+
+### Setup
+
+```json
+// .claude/settings.json
+{
+  "mcpServers": {
+    "todo-tree": {
+      "command": "node",
+      "args": ["path/to/todo-tree-next/mcp/dist/index.js"],
+      "env": {
+        "TODO_TREE_SCANNER_PATH": "path/to/todo-scanner.exe"
+      }
+    }
+  }
+}
+```
+
+Or run directly:
+
+```bash
+cd mcp && npm install && npm run build
+node dist/index.js
+```
+
+### Available Tools
+
+| Tool | Description |
+| --- | --- |
+| `scan_workspace` | Scan workspace for TODO/FIXME/BUG comments |
+| `scan_file` | Scan a single file |
+| `get_agent_context` | Ranked TODO context with git status, age analysis, and recommended actions |
+| `filter_todos` | Structured query filtering (`tag:TODO path:src priority:P0`) |
+| `annotate_finding` | Write annotations to `.todo-tree/annotations.json` |
+| `clear_annotations` | Clear annotations, optionally by source |
+| `get_debt_report` | TODO debt report (current branch vs base) |
+
+### MCP Resources
+
+| Resource | URI | Description |
+| --- | --- | --- |
+| Agent Context | `todo-tree://agent-context/{root}` | Live TODO context, updates on file changes |
+| Annotations | `todo-tree://annotations/{root}` | Current annotations |
+
+### Configuration
+
+The MCP server reads configuration from (in priority order):
+
+1. Environment variables: `TODO_TREE_SCANNER_PATH`, `TODO_TREE_TAGS`, `TODO_TREE_EXCLUDE_GLOBS`
+2. Config file: `.todo-tree/config.json` in workspace root
+3. Defaults matching the VS Code extension
+
 ## Architecture
 
 ```text
+MCP server (standalone, no VS Code required)
+  mcp/src/index.ts      MCP server entry point (stdio transport)
+  mcp/src/scanner.ts    Rust CLI subprocess adapter
+  mcp/src/config.ts     Configuration from env/file/defaults
+  mcp/src/annotations.ts  JSON file-based annotation storage
+  mcp/src/debtReport.ts Git TODO debt report
+  mcp/src/filterQuery.ts  Structured filter parser
+  mcp/src/watcher.ts    File watching + MCP resource notifications
+
 VS Code extension
   extension.js          entry point and legacy glue
   scannerClient.ts      Rust CLI JSON protocol
@@ -190,6 +254,9 @@ npm run lint:check
 npm run format:check
 npm run test:coverage
 cargo test --manifest-path scanner/Cargo.toml
+
+# MCP server
+cd mcp && npm install && npm run build && npm test
 ```
 
 Package:
@@ -205,7 +272,8 @@ Test coverage:
 | --- | ---: |
 | QUnit tests | 120 |
 | Rust tests | 38 |
-| Total | 158 |
+| MCP tests | 19 |
+| Total | 177 |
 
 ## Configuration
 

@@ -14,3 +14,4 @@ debug.log
 scanner/target
 
 bench/corpus
+.claude

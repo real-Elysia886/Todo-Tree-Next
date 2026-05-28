@@ -37,7 +37,10 @@
     "package:vsix": "vsce package --no-dependencies",
     "webpack": "webpack --mode development",
     "webpack-dev": "webpack --mode development --watch",
-    "prepare": "husky"
+    "prepare": "husky",
+    "mcp:build": "cd mcp && npm run build",
+    "mcp:dev": "cd mcp && npm run dev",
+    "mcp:test": "cd mcp && npm test"
   },
   "categories": [
     "Other"
