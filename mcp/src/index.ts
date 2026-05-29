@@ -2,6 +2,7 @@
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { SubscribeRequestSchema, UnsubscribeRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import * as path from 'path';
 import { loadConfig } from './config.js';
@@ -12,10 +13,13 @@ import { generateReport, formatMarkdown, formatJson, getDefaultBaseBranch } from
 import { createBranchTodoRisk, getChangedFilesSinceBase } from './branchRisk.js';
 import { FileWatcher } from './watcher.js';
 
-const server = new McpServer({
-    name: 'todo-tree-mcp',
-    version: '0.1.0',
-});
+const server = new McpServer(
+    {
+        name: 'todo-tree-mcp',
+        version: '0.1.0',
+    },
+    { capabilities: { resources: { subscribe: true } } }
+);
 
 const watchers = new Map<string, FileWatcher>();
 
@@ -23,7 +27,7 @@ function getWatcher(root: string): FileWatcher {
     let watcher = watchers.get(root);
     if (!watcher) {
         watcher = new FileWatcher(root, (uri) => {
-            server.server.sendResourceListChanged();
+            server.server.sendResourceUpdated({ uri });
         });
         watcher.start();
         watchers.set(root, watcher);
@@ -38,6 +42,17 @@ function resolveRoot(root?: string): string {
 function getConfig(root: string) {
     return loadConfig(root);
 }
+
+// Start the file watcher when a client subscribes so it receives resources/updated on changes.
+server.server.setRequestHandler(SubscribeRequestSchema, async (request) => {
+    const match = /^todo-tree:\/\/(?:agent-context|annotations)\/(.+)$/.exec(request.params.uri);
+    if (match) {
+        getWatcher(resolveRoot(decodeURIComponent(match[1])));
+    }
+    return {};
+});
+
+server.server.setRequestHandler(UnsubscribeRequestSchema, async () => ({}));
 
 // Tool: scan_workspace
 server.tool(

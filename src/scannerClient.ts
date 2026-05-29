@@ -4,7 +4,12 @@ import * as os from 'os';
 import * as path from 'path';
 import { AgentContext, ScanOutput, ScannerMatch, TodoItem } from './types';
 
-let currentProcess: child_process.ChildProcess | undefined;
+const currentProcesses = new Set<child_process.ChildProcess>();
+
+interface ScannerConfigFile {
+    path: string;
+    cleanup(): void;
+}
 
 interface ScannerOptions {
     unquotedRegex: string;
@@ -89,14 +94,11 @@ function splitGlobs(globs?: string[]): { includeGlobs: string[]; excludeGlobs: s
     return result;
 }
 
-function writeConfig(context: ExtensionContextLike, options: ScannerOptions): string {
-    const storagePath = context.storageUri && context.storageUri.fsPath ? context.storageUri.fsPath : os.tmpdir();
-    if (!fs.existsSync(storagePath)) {
-        fs.mkdirSync(storagePath, { recursive: true });
-    }
+function writeConfig(options: ScannerOptions): ScannerConfigFile {
+    const storagePath = fs.mkdtempSync(path.join(os.tmpdir(), 'todo-tree-scanner-'));
+    const configPath = path.join(storagePath, 'config.json');
 
     const globs = splitGlobs(options.globs);
-    const configPath = path.join(storagePath, 'todo-scanner-config.json');
     const scannerConfig = {
         regex: options.unquotedRegex,
         case_sensitive: options.caseSensitive !== false,
@@ -109,7 +111,12 @@ function writeConfig(context: ExtensionContextLike, options: ScannerOptions): st
     };
 
     fs.writeFileSync(configPath, JSON.stringify(scannerConfig), 'utf8');
-    return configPath;
+    return {
+        path: configPath,
+        cleanup(): void {
+            fs.rmSync(storagePath, { recursive: true, force: true });
+        },
+    };
 }
 
 function execScanner(
@@ -130,12 +137,12 @@ function execScanner(
             options.outputChannel.appendLine('Todo Tree scanner: ' + exe + ' ' + fullArgs.join(' '));
         }
 
-        currentProcess = child_process.execFile(
+        const scannerProcess = child_process.execFile(
             exe,
             fullArgs,
             { maxBuffer: 50 * 1024 * 1024 },
             (error, stdout, stderr) => {
-                currentProcess = undefined;
+                currentProcesses.delete(scannerProcess);
 
                 if (error) {
                     (error as Error & { stderr?: string }).stderr = stderr;
@@ -151,6 +158,7 @@ function execScanner(
                 }
             }
         );
+        currentProcesses.add(scannerProcess);
     });
 }
 
@@ -172,21 +180,23 @@ function toMatch(item: TodoItem): ScannerMatch {
 }
 
 function scanWorkspace(context: ExtensionContextLike, root: string, options: ScannerOptions): Promise<ScannerMatch[]> {
-    const configPath = writeConfig(context, options);
-    return execScanner(context, 'scan-workspace', ['--root', root, '--config', configPath], options).then((output) => {
-        if (options.outputChannel) {
-            options.outputChannel.appendLine(
-                'Todo Tree scanner: ' +
-                    output.total_items +
-                    ' items in ' +
-                    output.scanned_files +
-                    ' files, ' +
-                    output.elapsed_ms +
-                    'ms'
-            );
-        }
-        return output.items.map(toMatch);
-    });
+    const configFile = writeConfig(options);
+    return execScanner(context, 'scan-workspace', ['--root', root, '--config', configFile.path], options)
+        .then((output) => {
+            if (options.outputChannel) {
+                options.outputChannel.appendLine(
+                    'Todo Tree scanner: ' +
+                        output.total_items +
+                        ' items in ' +
+                        output.scanned_files +
+                        ' files, ' +
+                        output.elapsed_ms +
+                        'ms'
+                );
+            }
+            return output.items.map(toMatch);
+        })
+        .finally(() => configFile.cleanup());
 }
 
 function scanFile(
@@ -195,29 +205,22 @@ function scanFile(
     filename: string,
     options: ScannerOptions
 ): Promise<ScannerMatch[]> {
-    const configPath = writeConfig(context, options);
-    return execScanner(
-        context,
-        'scan-file',
-        ['--root', root, '--file', filename, '--config', configPath],
-        options
-    ).then((output) => output.items.map(toMatch));
+    const configFile = writeConfig(options);
+    return execScanner(context, 'scan-file', ['--root', root, '--file', filename, '--config', configFile.path], options)
+        .then((output) => output.items.map(toMatch))
+        .finally(() => configFile.cleanup());
 }
 
 function getAgentContext(context: ExtensionContextLike, root: string, options: ScannerOptions): Promise<AgentContext> {
-    const configPath = writeConfig(context, options);
-    return execScanner(
-        context,
-        'agent-context',
-        ['--root', root, '--config', configPath],
-        options
-    ) as Promise<unknown> as Promise<AgentContext>;
+    const configFile = writeConfig(options);
+    return execScanner(context, 'agent-context', ['--root', root, '--config', configFile.path], options)
+        .then((output) => output as unknown as AgentContext)
+        .finally(() => configFile.cleanup());
 }
 
 function kill(): void {
-    if (currentProcess !== undefined) {
-        currentProcess.kill('SIGINT');
-    }
+    currentProcesses.forEach((scannerProcess) => scannerProcess.kill('SIGINT'));
+    currentProcesses.clear();
 }
 
 module.exports.enabled = enabled;
