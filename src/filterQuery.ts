@@ -14,7 +14,7 @@ interface TodoLike {
     priority?: string;
 }
 
-function parse(text?: string): Query {
+export function parse(text?: string): Query {
     const query: Query = {
         terms: [],
         fields: {},
@@ -71,13 +71,13 @@ function tokenize(text: string): string[] {
     return tokens;
 }
 
-function createMatcher(text: string, caseSensitive: boolean): (node: TodoLike) => boolean {
+export function createMatcher(text: string, caseSensitive: boolean): (node: TodoLike) => boolean {
     const query = parse(text);
 
     return (node: TodoLike) => matchesNode(node, query, caseSensitive);
 }
 
-function matchesNode(node: TodoLike, query: Query, caseSensitive: boolean): boolean {
+export function matchesNode(node: TodoLike, query: Query, caseSensitive: boolean): boolean {
     const haystack = [
         node.label,
         node.after,
@@ -145,7 +145,3 @@ function markdownStatus(node: TodoLike): string {
     }
     return 'unknown';
 }
-
-module.exports.parse = parse;
-module.exports.createMatcher = createMatcher;
-module.exports.matchesNode = matchesNode;

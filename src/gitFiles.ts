@@ -8,11 +8,11 @@ interface GitStatusEntry {
     file: string;
 }
 
-function changedFiles(roots: string[]): Promise<string[]> {
+export function changedFiles(roots: string[]): Promise<string[]> {
     return collect(roots, 'changed');
 }
 
-function stagedFiles(roots: string[]): Promise<string[]> {
+export function stagedFiles(roots: string[]): Promise<string[]> {
     return collect(roots, 'staged');
 }
 
@@ -68,7 +68,7 @@ function status(root: string): Promise<GitStatusEntry[]> {
     });
 }
 
-function parseStatus(stdout: string): GitStatusEntry[] {
+export function parseStatus(stdout: string): GitStatusEntry[] {
     const parts = stdout.split('\0').filter((part) => part !== '');
     const entries: GitStatusEntry[] = [];
 
@@ -98,7 +98,3 @@ function parseStatus(stdout: string): GitStatusEntry[] {
 
     return entries;
 }
-
-module.exports.changedFiles = changedFiles;
-module.exports.stagedFiles = stagedFiles;
-module.exports.parseStatus = parseStatus;

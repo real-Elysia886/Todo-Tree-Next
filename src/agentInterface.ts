@@ -3,18 +3,14 @@ import * as vscode from 'vscode';
 import { AgentAnnotation, AgentContext, AgentTodoItem } from './types';
 
 interface ScannerClient {
-    enabled(context: vscode.ExtensionContext, options: Record<string, unknown>): boolean;
-    getAgentContext(
-        context: vscode.ExtensionContext,
-        root: string,
-        options: Record<string, unknown>
-    ): Promise<AgentContext>;
+    enabled(context: vscode.ExtensionContext, options: any): boolean;
+    getAgentContext(context: vscode.ExtensionContext, root: string, options: any): Promise<AgentContext>;
 }
 
 interface AgentInterfaceOptions {
     context: vscode.ExtensionContext;
     getRootFolders: () => string[];
-    getOptions: (filename: string) => Record<string, unknown>;
+    getOptions: (filename: string) => any;
     scannerClient: ScannerClient;
     outputChannel?: { appendLine(text: string): void };
 }

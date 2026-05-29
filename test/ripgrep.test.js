@@ -6,35 +6,35 @@ function createFakeProcess() {
     proc.stdout = new EventEmitter();
     proc.stderr = new EventEmitter();
     proc.killSignals = [];
-    proc.kill = function(signal) {
+    proc.kill = function (signal) {
         proc.killSignals.push(signal);
     };
     return proc;
 }
 
-QUnit.module('ripgrep command execution', function(hooks) {
+QUnit.module('ripgrep command execution', function (hooks) {
     let originalExecFile;
     let ripgrep;
 
-    hooks.beforeEach(function() {
+    hooks.beforeEach(function () {
         originalExecFile = childProcess.execFile;
-        delete require.cache[require.resolve('../src/ripgrep.js')];
-        ripgrep = require('../src/ripgrep.js');
+        delete require.cache[require.resolve('../src/ripgrep.ts')];
+        ripgrep = require('../src/ripgrep.ts');
     });
 
-    hooks.afterEach(function() {
+    hooks.afterEach(function () {
         childProcess.execFile = originalExecFile;
         ripgrep.kill();
     });
 
-    QUnit.test('splits quoted additional arguments before execFile', async function(assert) {
+    QUnit.test('splits quoted additional arguments before execFile', async function (assert) {
         const done = assert.async();
         let capturedArgs;
 
-        childProcess.execFile = function(file, args) {
+        childProcess.execFile = function (file, args) {
             capturedArgs = args;
             const proc = createFakeProcess();
-            setImmediate(function() {
+            setImmediate(function () {
                 proc.stdout.emit('data', 'src/a file.js:2:4:// TODO quoted arg\n');
                 proc.emit('close', 0);
             });
@@ -46,7 +46,7 @@ QUnit.module('ripgrep command execution', function(hooks) {
             additional: '--glob "src/a file.js" --type-not test',
             regex: '"TODO"',
             unquotedRegex: 'TODO',
-            globs: ['*.js', '!dist/**']
+            globs: ['*.js', '!dist/**'],
         });
 
         assert.deepEqual(capturedArgs.slice(0, 7), [
@@ -56,7 +56,7 @@ QUnit.module('ripgrep command execution', function(hooks) {
             '--column',
             '--line-number',
             '--color',
-            'never'
+            'never',
         ]);
         assert.ok(capturedArgs.includes('--glob'), 'keeps additional flag');
         assert.ok(capturedArgs.includes('src/a file.js'), 'keeps quoted additional value as one arg');
@@ -71,11 +71,11 @@ QUnit.module('ripgrep command execution', function(hooks) {
         done();
     });
 
-    QUnit.test('kill sends SIGINT to the active ripgrep process', function(assert) {
+    QUnit.test('kill sends SIGINT to the active ripgrep process', function (assert) {
         const done = assert.async();
         const proc = createFakeProcess();
 
-        childProcess.execFile = function() {
+        childProcess.execFile = function () {
             return proc;
         };
 
@@ -84,7 +84,7 @@ QUnit.module('ripgrep command execution', function(hooks) {
             additional: '',
             regex: '"TODO"',
             unquotedRegex: 'TODO',
-            globs: []
+            globs: [],
         });
 
         ripgrep.kill();
@@ -95,13 +95,15 @@ QUnit.module('ripgrep command execution', function(hooks) {
     });
 });
 
-QUnit.module('ripgrep argument helpers', function() {
-    QUnit.test('splitArgs preserves quoted strings and escaped spaces', function(assert) {
-        const helpers = require('../src/ripgrep.js').__test;
+QUnit.module('ripgrep argument helpers', function () {
+    QUnit.test('splitArgs preserves quoted strings and escaped spaces', function (assert) {
+        const helpers = require('../src/ripgrep.ts').__test;
 
-        assert.deepEqual(
-            helpers.splitArgs('--glob "src/a file.js" --fixed-strings foo\\ bar'),
-            ['--glob', 'src/a file.js', '--fixed-strings', 'foo bar']
-        );
+        assert.deepEqual(helpers.splitArgs('--glob "src/a file.js" --fixed-strings foo\\ bar'), [
+            '--glob',
+            'src/a file.js',
+            '--fixed-strings',
+            'foo bar',
+        ]);
     });
 });

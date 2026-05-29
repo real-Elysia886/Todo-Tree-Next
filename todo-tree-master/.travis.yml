@@ -1,0 +1,13 @@
+sudo: false
+
+os:
+  - osx
+  - linux
+
+dist: bionic
+
+before_install:
+  - npm install
+
+script:
+  - npm test

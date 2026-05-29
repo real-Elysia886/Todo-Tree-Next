@@ -1,12 +1,10 @@
-/* jshint esversion:6 */
+import * as vscode from 'vscode';
+import * as path from 'path';
 
-var vscode = require('vscode') as typeof import('vscode');
-var path = require('path') as typeof import('path');
-
-var utils = require('./utils.js') as any;
-var icons = require('./icons.js') as any;
-var config = require('./config.js') as any;
-var filterQuery = require('./filterQuery') as any;
+import * as utils from './utils';
+import * as icons from './icons';
+import * as config from './config';
+import * as filterQuery from './filterQuery';
 
 interface TreeNode {
     type: string;
@@ -322,7 +320,7 @@ function createTodoNode(result: any): any {
     return todo;
 }
 
-function locateWorkspaceNode(filename: string): any {
+export function locateWorkspaceNode(filename: string): any {
     let result;
     nodes.map(function (node) {
         const workspacePath = node.fsPath + (node.fsPath.indexOf(path.sep) === node.fsPath.length - 1 ? '' : path.sep);
@@ -473,7 +471,7 @@ function addWorkspaceFolders() {
     }
 }
 
-class TreeNodeProvider {
+export class TreeNodeProvider {
     _context: any;
     _debug: (text: string) => void;
     onTreeRefreshed: (() => void) | undefined;
@@ -1119,6 +1117,3 @@ function extractPriority(text) {
     }
     return 'none';
 }
-
-exports.TreeNodeProvider = TreeNodeProvider;
-exports.locateWorkspaceNode = locateWorkspaceNode;

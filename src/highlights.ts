@@ -1,10 +1,10 @@
-var vscode = require('vscode') as typeof import('vscode');
-var execWithIndices = require('regexp-match-indices').shim();
+import * as vscode from 'vscode';
+require('regexp-match-indices').shim();
 
-var config = require('./config.js') as any;
-var utils = require('./utils.js') as any;
-var attributes = require('./attributes.js') as any;
-var icons = require('./icons.js') as any;
+import * as config from './config';
+import * as utils from './utils';
+import * as attributes from './attributes';
+import * as icons from './icons';
 
 const captureGroupArgument = 'capture-groups';
 type TextEditorDecorationType = import('vscode').TextEditorDecorationType;
@@ -22,7 +22,7 @@ const highlightTimer: Record<string, any> = {};
 let context: any;
 let debug: (text: string) => void;
 
-function init(context_: any, debug_: (text: string) => void): void {
+export function init(context_: any, debug_: (text: string) => void): void {
     context = context_;
     debug = debug_;
     context.subscriptions.push({
@@ -37,28 +37,29 @@ function init(context_: any, debug_: (text: string) => void): void {
     });
 }
 
-function applyOpacity(colour: string, opacity: number): string {
-    if (utils.isHexColour(colour)) {
-        colour = utils.hexToRgba(colour, opacity < 1 ? opacity * 100 : opacity);
-    } else if (utils.isRgbColour(colour)) {
-        if (opacity !== 100) {
-            colour = utils.setRgbAlpha(colour, opacity > 1 ? opacity / 100 : opacity);
+function applyOpacity(colour: string | vscode.ThemeColor, opacity: number): string | vscode.ThemeColor {
+    if (typeof colour === 'string') {
+        if (utils.isHexColour(colour)) {
+            colour = utils.hexToRgba(colour, opacity < 1 ? opacity * 100 : opacity);
+        } else if (utils.isRgbColour(colour)) {
+            if (opacity !== 100) {
+                colour = utils.setRgbAlpha(colour, opacity > 1 ? opacity / 100 : opacity);
+            }
         }
     }
-
     return colour;
 }
 
-function getDecoration(tag) {
+export function getDecoration(tag: string): vscode.TextEditorDecorationType {
     const foregroundColour = attributes.getForeground(tag);
     const backgroundColour = attributes.getBackground(tag);
 
     const opacity = getOpacity(tag);
 
-    let lightForegroundColour = foregroundColour;
-    let darkForegroundColour = foregroundColour;
-    let lightBackgroundColour = backgroundColour;
-    let darkBackgroundColour = backgroundColour;
+    let lightForegroundColour: string | vscode.ThemeColor | undefined = foregroundColour;
+    let darkForegroundColour: string | vscode.ThemeColor | undefined = foregroundColour;
+    let lightBackgroundColour: string | vscode.ThemeColor | undefined = backgroundColour;
+    let darkBackgroundColour: string | vscode.ThemeColor | undefined = backgroundColour;
 
     if (foregroundColour) {
         if (foregroundColour.match(/(foreground|background)/i)) {
@@ -83,10 +84,18 @@ function getDecoration(tag) {
         darkBackgroundColour = applyOpacity(darkBackgroundColour, opacity);
     }
 
-    if (lightForegroundColour === undefined && utils.isHexColour(lightBackgroundColour)) {
+    if (
+        lightForegroundColour === undefined &&
+        typeof lightBackgroundColour === 'string' &&
+        utils.isHexColour(lightBackgroundColour)
+    ) {
         lightForegroundColour = utils.complementaryColour(lightBackgroundColour);
     }
-    if (darkForegroundColour === undefined && utils.isHexColour(darkBackgroundColour)) {
+    if (
+        darkForegroundColour === undefined &&
+        typeof darkBackgroundColour === 'string' &&
+        utils.isHexColour(darkBackgroundColour)
+    ) {
         darkForegroundColour = utils.complementaryColour(darkBackgroundColour);
     }
 
@@ -110,14 +119,14 @@ function getDecoration(tag) {
         fontWeight: getFontWeight(tag),
         fontStyle: getFontStyle(tag),
         textDecoration: getTextDecoration(tag),
-        gutterIconPath: showInGutter(tag) ? icons.getIcon(context, tag, debug).dark : undefined,
+        gutterIconPath: showInGutter(tag) ? icons.getIcon(context, tag, debug) : undefined,
     };
 
     if (lane !== undefined) {
         let rulerColour = getRulerColour(tag, darkBackgroundColour ? darkBackgroundColour : 'editor.foreground');
         const rulerOpacity = getRulerOpacity(tag);
 
-        if (utils.isThemeColour(rulerColour)) {
+        if (typeof rulerColour === 'string' && utils.isThemeColour(rulerColour)) {
             rulerColour = new vscode.ThemeColor(rulerColour);
         } else {
             rulerColour = applyOpacity(rulerColour, rulerOpacity);
@@ -133,43 +142,43 @@ function getDecoration(tag) {
     return vscode.window.createTextEditorDecorationType(decorationOptions);
 }
 
-function getRulerColour(tag, defaultColour) {
+function getRulerColour(tag: string, defaultColour: string | vscode.ThemeColor): string | vscode.ThemeColor {
     return attributes.getAttribute(tag, 'rulerColour', defaultColour);
 }
 
-function getRulerLane(tag) {
+function getRulerLane(tag: string): any {
     return attributes.getAttribute(tag, 'rulerLane', 4);
 }
 
-function getOpacity(tag) {
+function getOpacity(tag: string): number {
     return attributes.getAttribute(tag, 'opacity', 100);
 }
 
-function getRulerOpacity(tag) {
+function getRulerOpacity(tag: string): number {
     return attributes.getAttribute(tag, 'rulerOpacity', 100);
 }
 
-function getBorderRadius(tag) {
+function getBorderRadius(tag: string): string {
     return attributes.getAttribute(tag, 'borderRadius', '0.2em');
 }
 
-function getFontStyle(tag) {
+function getFontStyle(tag: string): string {
     return attributes.getAttribute(tag, 'fontStyle', 'normal');
 }
 
-function getFontWeight(tag) {
+function getFontWeight(tag: string): string {
     return attributes.getAttribute(tag, 'fontWeight', 'normal');
 }
 
-function getTextDecoration(tag) {
+function getTextDecoration(tag: string): string {
     return attributes.getAttribute(tag, 'textDecoration', '');
 }
 
-function showInGutter(tag) {
+function showInGutter(tag: string): boolean {
     return attributes.getAttribute(tag, 'gutterIcon', false);
 }
 
-function getType(tag) {
+function getType(tag: string): string {
     return attributes.getAttribute(
         tag,
         'type',
@@ -177,7 +186,7 @@ function getType(tag) {
     );
 }
 
-function editorId(editor) {
+function editorId(editor: vscode.TextEditor): string {
     let id = '';
     if (editor.document) {
         id = JSON.stringify(editor.document.uri);
@@ -188,8 +197,8 @@ function editorId(editor) {
     return id;
 }
 
-function highlight(editor) {
-    function addDecoration(startPos, endPos) {
+function highlight(editor?: vscode.TextEditor): void {
+    function addDecoration(startPos: vscode.Position, endPos: vscode.Position): void {
         const decoration = { range: new vscode.Range(startPos, endPos) };
         if (documentHighlights[tag] === undefined) {
             documentHighlights[tag] = [];
@@ -197,8 +206,8 @@ function highlight(editor) {
         documentHighlights[tag].push(decoration);
     }
 
-    var documentHighlights = {};
-    const subTagHighlights = {};
+    var documentHighlights: Record<string, any[]> = {};
+    const subTagHighlights: Record<string, any[]> = {};
     const customHighlight = config.customHighlight();
 
     if (editor) {
@@ -331,7 +340,7 @@ function highlight(editor) {
     }
 }
 
-function triggerHighlight(editor) {
+export function triggerHighlight(editor?: vscode.TextEditor): void {
     if (editor) {
         const id = editorId(editor);
 
@@ -345,7 +354,3 @@ function triggerHighlight(editor) {
         );
     }
 }
-
-module.exports.init = init;
-module.exports.getDecoration = getDecoration;
-module.exports.triggerHighlight = triggerHighlight;

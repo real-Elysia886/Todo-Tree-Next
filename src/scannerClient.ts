@@ -55,11 +55,11 @@ function scannerMode(): string {
     return require('vscode').workspace.getConfiguration('todo-tree.scanner').get('engine', 'auto');
 }
 
-function isRustRequired(): boolean {
+export function isRustRequired(): boolean {
     return scannerMode() === 'rust';
 }
 
-function unavailableReason(context: ExtensionContextLike, options: ScannerOptions): string | undefined {
+export function unavailableReason(context: ExtensionContextLike, options: ScannerOptions): string | undefined {
     if (options.multiline === true) {
         return 'the Rust scanner does not support multiline regular expressions';
     }
@@ -71,7 +71,7 @@ function unavailableReason(context: ExtensionContextLike, options: ScannerOption
     return undefined;
 }
 
-function enabled(context: ExtensionContextLike, options: ScannerOptions): boolean {
+export function enabled(context: ExtensionContextLike, options: ScannerOptions): boolean {
     const mode = scannerMode();
     if (mode === 'ripgrep') {
         return false;
@@ -179,7 +179,11 @@ function toMatch(item: TodoItem): ScannerMatch {
     };
 }
 
-function scanWorkspace(context: ExtensionContextLike, root: string, options: ScannerOptions): Promise<ScannerMatch[]> {
+export function scanWorkspace(
+    context: ExtensionContextLike,
+    root: string,
+    options: ScannerOptions
+): Promise<ScannerMatch[]> {
     const configFile = writeConfig(options);
     return execScanner(context, 'scan-workspace', ['--root', root, '--config', configFile.path], options)
         .then((output) => {
@@ -199,7 +203,7 @@ function scanWorkspace(context: ExtensionContextLike, root: string, options: Sca
         .finally(() => configFile.cleanup());
 }
 
-function scanFile(
+export function scanFile(
     context: ExtensionContextLike,
     root: string,
     filename: string,
@@ -211,22 +215,18 @@ function scanFile(
         .finally(() => configFile.cleanup());
 }
 
-function getAgentContext(context: ExtensionContextLike, root: string, options: ScannerOptions): Promise<AgentContext> {
+export function getAgentContext(
+    context: ExtensionContextLike,
+    root: string,
+    options: ScannerOptions
+): Promise<AgentContext> {
     const configFile = writeConfig(options);
     return execScanner(context, 'agent-context', ['--root', root, '--config', configFile.path], options)
         .then((output) => output as unknown as AgentContext)
         .finally(() => configFile.cleanup());
 }
 
-function kill(): void {
+export function kill(): void {
     currentProcesses.forEach((scannerProcess) => scannerProcess.kill('SIGINT'));
     currentProcesses.clear();
 }
-
-module.exports.enabled = enabled;
-module.exports.isRustRequired = isRustRequired;
-module.exports.unavailableReason = unavailableReason;
-module.exports.scanWorkspace = scanWorkspace;
-module.exports.scanFile = scanFile;
-module.exports.getAgentContext = getAgentContext;
-module.exports.kill = kill;

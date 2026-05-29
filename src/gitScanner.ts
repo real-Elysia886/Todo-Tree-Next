@@ -1,8 +1,8 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
 
-const searchResults = require('./searchResults.js');
-const gitFiles = require('./gitFiles');
+import * as searchResults from './searchResults';
+import * as gitFiles from './gitFiles';
 
 interface GitScannerOptions {
     context: vscode.ExtensionContext;
@@ -14,26 +14,16 @@ interface GitScannerOptions {
     searchList: string[];
     getGitRoots(): string[];
     getRootForFile(filename: string): string;
-    getOptions(filename: string): Record<string, unknown>;
-    scannerClient: {
-        enabled(context: vscode.ExtensionContext, options: Record<string, unknown>): boolean;
-        scanFile(
-            context: vscode.ExtensionContext,
-            root: string,
-            filename: string,
-            options: Record<string, unknown>
-        ): Promise<unknown[]>;
-    };
-    ripgrep: {
-        search(root: string, options: Record<string, unknown>): Promise<unknown[]>;
-    };
+    getOptions(filename: string): any;
+    scannerClient: any;
+    ripgrep: any;
     addMatches(matches: unknown[], options: Record<string, unknown>, source: string): void;
     addResultsToTree(): void;
     debug(text: string): void;
     setInterrupted(value: boolean): void;
 }
 
-function scanGitFiles(options: GitScannerOptions, staged: boolean): void {
+export function scanGitFiles(options: GitScannerOptions, staged: boolean): void {
     const roots = options.getGitRoots();
     if (roots.length === 0) {
         vscode.window.showInformationMessage('Todo Tree: No workspace folders available for Git scanning.');
@@ -80,25 +70,25 @@ function scanFilePath(options: GitScannerOptions, filename: string): Promise<voi
     if (options.scannerClient.enabled(options.context, scanOptions) === true) {
         return options.scannerClient
             .scanFile(options.context, root, filename, scanOptions)
-            .then((matches) => {
+            .then((matches: any) => {
                 options.addMatches(matches, { filename: filename }, 'Rust Git File');
             })
             .catch((e: Error) => {
                 options.debug('Rust git file scan failed; falling back to ripgrep: ' + e.message);
                 const fallbackOptions = options.getOptions(filename);
-                return options.ripgrep.search('/', fallbackOptions).then((matches) => {
+                return options.ripgrep.search('/', fallbackOptions).then((matches: any) => {
                     options.addMatches(matches, fallbackOptions, 'Git File');
                 });
             });
     }
 
     scanOptions = options.getOptions(filename);
-    return options.ripgrep.search('/', scanOptions).then((matches) => {
+    return options.ripgrep.search('/', scanOptions).then((matches: any) => {
         options.addMatches(matches, scanOptions, 'Git File');
     });
 }
 
-function getGitRoots(getRootFolders: () => string[]): string[] {
+export function getGitRoots(getRootFolders: () => string[]): string[] {
     let roots = getRootFolders() || [];
 
     if (roots.length === 0 && vscode.workspace.workspaceFolders) {
@@ -110,7 +100,7 @@ function getGitRoots(getRootFolders: () => string[]): string[] {
     return roots;
 }
 
-function getRootForFile(filename: string, getRootFolders: () => string[]): string {
+export function getRootForFile(filename: string, getRootFolders: () => string[]): string {
     let roots = getRootFolders() || [];
 
     if (roots.length === 0 && vscode.workspace.workspaceFolders) {
@@ -127,7 +117,3 @@ function getRootForFile(filename: string, getRootFolders: () => string[]): strin
         }) || path.dirname(filename)
     );
 }
-
-module.exports.scanGitFiles = scanGitFiles;
-module.exports.getGitRoots = getGitRoots;
-module.exports.getRootForFile = getRootForFile;

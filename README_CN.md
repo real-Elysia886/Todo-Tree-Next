@@ -22,7 +22,7 @@
   <img src="https://img.shields.io/badge/Rust-scanner-orange?logo=rust" alt="Rust scanner">
   <img src="https://img.shields.io/badge/TypeScript-modular-blue?logo=typescript" alt="TypeScript">
   <img src="https://img.shields.io/badge/AI%20Agent-ready-6f42c1" alt="AI Agent ready">
-  <img src="https://img.shields.io/badge/tests-177%20passing-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/tests-187%20passing-brightgreen" alt="Tests">
 </p>
 
 <p align="center">
@@ -223,7 +223,7 @@ MCP 服务器（独立运行，无需 VS Code）
   mcp/src/watcher.ts    文件监听 + MCP 资源变更通知
 
 VS Code 插件层
-  extension.js          插件入口和旧逻辑粘合层
+  extension.ts          插件入口和旧逻辑粘合层
   scannerClient.ts      Rust CLI JSON 协议
   agentInterface.ts     AI Agent 上下文和诊断标注
   dashboard.ts          Webview 仪表盘
@@ -233,8 +233,8 @@ VS Code 插件层
   debtReport.ts         Git TODO 债务报告
   constants.ts          共享常量（扫描模式、状态栏、按钮）
   globUtils.ts          ripgrep glob 构建工具
-  config.js             配置读取层（带缓存）
-  searchResults.js      Map 索引的搜索结果存储
+  config.ts             配置读取层（带缓存）
+  searchResults.ts      Map 索引的搜索结果存储
 
 Rust 扫描器
   main.rs               scan-workspace、scan-file、agent-context、benchmark
@@ -270,10 +270,10 @@ npx --yes @vscode/vsce package
 
 | 类型 | 数量 |
 | --- | ---: |
-| QUnit 测试 | 120 |
+| QUnit 测试 | 122 |
 | Rust 测试 | 38 |
-| MCP 测试 | 19 |
-| 总计 | 177 |
+| MCP 测试 | 27 |
+| 总计 | 187 |
 
 ## 配置
 

@@ -7,7 +7,7 @@ interface ExtensionContextStorage {
     globalStorageUri?: { fsPath?: string };
 }
 
-function getStoragePath(context: ExtensionContextStorage): string {
+export function getStoragePath(context: ExtensionContextStorage): string {
     if (context.storageUri && context.storageUri.fsPath) {
         return context.storageUri.fsPath;
     }
@@ -19,5 +19,3 @@ function getStoragePath(context: ExtensionContextStorage): string {
     }
     return path.join(os.tmpdir(), 'todo-tree');
 }
-
-module.exports.getStoragePath = getStoragePath;

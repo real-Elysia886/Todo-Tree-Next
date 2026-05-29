@@ -32,7 +32,7 @@ interface DashboardPanelLike {
 
 let panel: vscode.WebviewPanel | undefined;
 
-function show(context: vscode.ExtensionContext, provider: CountProvider, actions: DashboardActions): void {
+export function show(context: vscode.ExtensionContext, provider: CountProvider, actions: DashboardActions): void {
     collectTrendData(context, provider);
 
     if (panel) {
@@ -57,7 +57,7 @@ function show(context: vscode.ExtensionContext, provider: CountProvider, actions
     });
 }
 
-function refresh(context: vscode.ExtensionContext, provider: CountProvider): void {
+export function refresh(context: vscode.ExtensionContext, provider: CountProvider): void {
     if (panel) {
         panel.webview.html = html(context, provider);
     }
@@ -530,9 +530,7 @@ function escapeHtml(text: unknown): string {
     return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-module.exports.show = show;
-module.exports.refresh = refresh;
-module.exports.__test = {
+export const __test = {
     parseGitLog,
     countGitGrepOutput,
     completeTrendData,

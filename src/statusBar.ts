@@ -1,8 +1,8 @@
 import * as vscode from 'vscode';
 
-const attributes = require('./attributes.js');
-const config = require('./config.js');
-const utils = require('./utils.js');
+import * as attributes from './attributes';
+import * as config from './config';
+import * as utils from './utils';
 
 const STATUS_BAR_TOTAL = 'total';
 const STATUS_BAR_TAGS = 'tags';
@@ -18,8 +18,8 @@ interface StatusBarProvider {
 }
 
 interface StatusBarTreeView {
-    badge: { value: number };
-    title: string;
+    badge?: { value: number } | undefined;
+    title?: string | undefined;
     visible: boolean;
 }
 

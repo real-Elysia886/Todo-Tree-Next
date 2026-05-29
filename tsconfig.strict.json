@@ -21,6 +21,7 @@
     "src/scopeManager.ts",
     "src/statusBar.ts",
     "src/storagePath.ts",
-    "src/types.ts"
+    "src/types.ts",
+    "src/declarations.d.ts"
   ]
 }

@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 
-const searchResults = require('./searchResults.js');
+import * as searchResults from './searchResults';
 
 const SCAN_MODE_WORKSPACE_AND_OPEN_FILES = 'workspace';
 const SCAN_MODE_CURRENT_FILE = 'current file';

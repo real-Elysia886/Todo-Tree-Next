@@ -22,7 +22,7 @@
   <img src="https://img.shields.io/badge/Rust-scanner-orange?logo=rust" alt="Rust scanner">
   <img src="https://img.shields.io/badge/TypeScript-modular-blue?logo=typescript" alt="TypeScript">
   <img src="https://img.shields.io/badge/AI%20Agent-ready-6f42c1" alt="AI Agent ready">
-  <img src="https://img.shields.io/badge/tests-177%20passing-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/tests-187%20passing-brightgreen" alt="Tests">
 </p>
 
 <p align="center">
@@ -223,7 +223,7 @@ MCP server (standalone, no VS Code required)
   mcp/src/watcher.ts    File watching + MCP resource notifications
 
 VS Code extension
-  extension.js          entry point and legacy glue
+  extension.ts          entry point and legacy glue
   scannerClient.ts      Rust CLI JSON protocol
   agentInterface.ts     AI Agent context and diagnostics
   dashboard.ts          Webview dashboard
@@ -233,8 +233,8 @@ VS Code extension
   debtReport.ts         Git TODO debt report
   constants.ts          Shared constants (scan modes, status bar, buttons)
   globUtils.ts          Glob building utilities for ripgrep
-  config.js             Configuration reader with caching layer
-  searchResults.js      Map-indexed search result store
+  config.ts             Configuration reader with caching layer
+  searchResults.ts      Map-indexed search result store
 
 Rust scanner
   main.rs               scan-workspace, scan-file, agent-context, benchmark
@@ -270,10 +270,10 @@ Test coverage:
 
 | Type | Count |
 | --- | ---: |
-| QUnit tests | 120 |
+| QUnit tests | 122 |
 | Rust tests | 38 |
-| MCP tests | 19 |
-| Total | 177 |
+| MCP tests | 27 |
+| Total | 187 |
 
 ## Configuration
 
