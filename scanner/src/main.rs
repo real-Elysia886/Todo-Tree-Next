@@ -1,4 +1,5 @@
 mod config;
+mod daemon;
 mod matcher;
 mod output;
 mod walker;
@@ -26,10 +27,15 @@ fn main() {
 fn run() -> Result<()> {
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
-        bail!("missing command: scan-workspace, scan-file, agent-context, or benchmark");
+        bail!("missing command: daemon, scan-workspace, scan-file, agent-context, or benchmark");
     }
 
     let command = args[1].as_str();
+
+    if command == "daemon" {
+        return daemon::run_daemon();
+    }
+
     let root = required_arg(&args, "--root")?;
     let config_path = required_arg(&args, "--config")?;
     let config = ScannerConfig::from_path(Path::new(&config_path))?;

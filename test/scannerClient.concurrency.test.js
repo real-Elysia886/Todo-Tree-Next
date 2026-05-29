@@ -80,6 +80,11 @@ QUnit.test('concurrent scans use isolated config files', async function (assert)
             'FIXME scan only sees its own tag'
         );
     } finally {
+        try {
+            require('../src/scannerClient.ts').kill();
+        } catch (e) {
+            // scannerClient may not have loaded if setup failed early.
+        }
         Module._load = originalLoad;
         fs.rmSync(root, { recursive: true, force: true });
     }

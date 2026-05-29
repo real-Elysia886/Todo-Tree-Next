@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { AgentContext, ScanOutput, ScannerMatch, TodoItem } from './types';
+import { daemonConnector } from './daemonConnector';
 
 const currentProcesses = new Set<child_process.ChildProcess>();
 
@@ -184,6 +185,23 @@ export function scanWorkspace(
     root: string,
     options: ScannerOptions
 ): Promise<ScannerMatch[]> {
+    if (enabled(context, options)) {
+        return daemonConnector.request<ScanOutput>(context, options, root, 'scan-workspace', {}).then((output) => {
+            if (options.outputChannel) {
+                options.outputChannel.appendLine(
+                    'Todo Tree Daemon (Workspace): ' +
+                        output.total_items +
+                        ' items in ' +
+                        output.scanned_files +
+                        ' files, ' +
+                        output.elapsed_ms +
+                        'ms'
+                );
+            }
+            return output.items.map(toMatch);
+        });
+    }
+
     const configFile = writeConfig(options);
     return execScanner(context, 'scan-workspace', ['--root', root, '--config', configFile.path], options)
         .then((output) => {
@@ -209,6 +227,18 @@ export function scanFile(
     filename: string,
     options: ScannerOptions
 ): Promise<ScannerMatch[]> {
+    if (enabled(context, options)) {
+        return daemonConnector
+            .scanFileDebounced(context, options, root, filename)
+            .then((output) => output.items.map(toMatch))
+            .catch((err: any) => {
+                if (err.message === 'superseded by new update') {
+                    return [] as ScannerMatch[];
+                }
+                throw err;
+            });
+    }
+
     const configFile = writeConfig(options);
     return execScanner(context, 'scan-file', ['--root', root, '--file', filename, '--config', configFile.path], options)
         .then((output) => output.items.map(toMatch))
@@ -220,6 +250,12 @@ export function getAgentContext(
     root: string,
     options: ScannerOptions
 ): Promise<AgentContext> {
+    if (enabled(context, options)) {
+        return daemonConnector
+            .request<AgentContext>(context, options, root, 'agent-context', {})
+            .then((output) => output);
+    }
+
     const configFile = writeConfig(options);
     return execScanner(context, 'agent-context', ['--root', root, '--config', configFile.path], options)
         .then((output) => output as unknown as AgentContext)
@@ -227,6 +263,7 @@ export function getAgentContext(
 }
 
 export function kill(): void {
+    daemonConnector.cleanup();
     currentProcesses.forEach((scannerProcess) => scannerProcess.kill('SIGINT'));
     currentProcesses.clear();
 }
